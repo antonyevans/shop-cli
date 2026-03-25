@@ -1,13 +1,18 @@
-"""Config loading for ~/.shop/config.yaml and ~/.shop/merchants.yaml."""
+"""Config loading for ~/.shop/config.yaml and ~/.shop/merchants.yaml.
+
+Set SHOP_HOME env var to override the config directory (useful in read-only
+home environments): SHOP_HOME=/writable/path shop search products "coffee"
+"""
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 
-SHOP_DIR = Path.home() / ".shop"
+SHOP_DIR = Path(os.environ["SHOP_HOME"]) if "SHOP_HOME" in os.environ else Path.home() / ".shop"
 CONFIG_PATH = SHOP_DIR / "config.yaml"
 MERCHANTS_PATH = SHOP_DIR / "merchants.yaml"
 
