@@ -1,0 +1,164 @@
+# MockAdapter fixture catalog — deterministic test data.
+# Products intentionally vary in data quality to exercise confidence scoring.
+
+products:
+  - sku: "coffee-filters-100"
+    title: "Premium Cone Coffee Filters, 100ct"
+    description: "Unbleached cone filters, #4 size, fits most 8-12 cup drip brewers."
+    price: 8.99
+    price_history_30d: {min: 8.99, max: 9.49}
+    availability: InStock
+    stock_count: 847
+    shipping:
+      cost: 0.00
+      window_days: "2-4"
+      carrier: USPS
+    returns:
+      window_days: 30
+      restocking_fee: null
+      condition: "unopened"
+      refund_timeline_days: 5
+    trust:
+      seller_rating: 4.7
+      review_count: 312
+      certifications: []
+      authenticity: "verified"
+    category: household
+
+  - sku: "dish-soap-blue"
+    title: "Blue Dawn Dish Soap 19.4oz"
+    description: "Original scent, cuts through grease."
+    price: 5.49
+    price_history_30d: {min: 4.99, max: 5.99}
+    availability: InStock
+    stock_count: 1203
+    shipping:
+      cost: 0.00
+      window_days: "2-4"
+      carrier: UPS
+    returns:
+      window_days: 30
+      restocking_fee: null
+      condition: "unopened"
+      refund_timeline_days: 7
+    trust:
+      seller_rating: 4.8
+      review_count: 891
+      certifications: ["EPA Safer Choice"]
+      authenticity: "verified"
+    category: household
+
+  - sku: "spiral-notebook-a5"
+    title: "A5 Spiral Notebook, Dotted, 160 pages"
+    description: "Lay-flat binding, 80gsm paper, dotted grid."
+    price: 12.99
+    price_history_30d: {min: 11.99, max: 14.99}
+    availability: InStock
+    stock_count: 234
+    shipping:
+      cost: 3.99
+      window_days: "5-7"
+      carrier: null
+    returns:
+      window_days: 14
+      restocking_fee: null
+      condition: null        # missing — reduces return_policy score
+      refund_timeline_days: null  # missing — reduces return_policy score
+    trust:
+      seller_rating: 4.1
+      review_count: 47       # 10-49 bracket → 0.7
+      certifications: []
+      authenticity: null
+    category: office
+
+  - sku: "building-blocks-60pc"
+    title: "Classic Building Blocks 60-Piece Set"
+    description: null        # missing description
+    price: 24.99
+    price_history_30d: null  # no price history
+    availability: InStock
+    stock_count: 88
+    shipping:
+      cost: 0.00
+      window_days: "3-5"
+      carrier: FedEx
+    returns:
+      window_days: 30
+      restocking_fee: 0.00
+      condition: "original packaging"
+      refund_timeline_days: 10
+    trust:
+      seller_rating: 4.6
+      review_count: 156
+      certifications: ["CPSC", "ASTM F963"]
+      authenticity: "verified"
+    category: toys
+
+  - sku: "no-rating-widget"
+    title: "Generic Replacement Widget"
+    description: "Fits models XZ-100 through XZ-400."
+    price: 3.49
+    price_history_30d: {min: 3.49, max: 3.49}
+    availability: InStock
+    stock_count: null
+    shipping:
+      cost: null             # missing — reduces completeness score
+      window_days: null      # missing — reduces completeness score
+      carrier: null
+    returns:
+      window_days: null      # missing
+      restocking_fee: null
+      condition: null
+      refund_timeline_days: null
+    trust:
+      seller_rating: null    # no rating
+      review_count: 3        # 1-9 bracket → 0.4
+      certifications: null
+      authenticity: null
+    category: parts
+
+  - sku: "tshirt-black-m"
+    title: "Heavyweight Cotton T-Shirt, Black, Medium"
+    description: "6.1oz 100% cotton, pre-shrunk."
+    price: 18.00
+    price_history_30d: {min: 16.00, max: 22.00}  # ratio 1.375 → low stability
+    availability: InStock
+    stock_count: 45
+    shipping:
+      cost: 4.99
+      window_days: "7-10"
+      carrier: null
+    returns:
+      window_days: 60
+      restocking_fee: null
+      condition: "unworn with tags"
+      refund_timeline_days: 14
+    trust:
+      seller_rating: 3.8    # 3.5-3.9 bracket → 0.4
+      review_count: 22
+      certifications: []
+      authenticity: null
+    category: clothing
+
+  - sku: "out-of-stock-item"
+    title: "Discontinued Part (Out of Stock)"
+    description: "Legacy replacement part."
+    price: 9.99
+    price_history_30d: null
+    availability: OutOfStock
+    stock_count: 0
+    shipping:
+      cost: 0.00
+      window_days: null
+      carrier: null
+    returns:
+      window_days: null
+      restocking_fee: null
+      condition: null
+      refund_timeline_days: null
+    trust:
+      seller_rating: 4.0
+      review_count: 8
+      certifications: []
+      authenticity: null
+    category: parts
