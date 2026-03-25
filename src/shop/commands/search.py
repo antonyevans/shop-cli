@@ -46,10 +46,9 @@ async def _search_one(
         adapter = create_adapter(merchant)
         start = time.monotonic()
         try:
-            async with asyncio.timeout(_TIMEOUT_SECONDS):
-                products = await adapter.search(query, filters)
+            products = await asyncio.wait_for(adapter.search(query, filters), timeout=_TIMEOUT_SECONDS)
             return products, None
-        except TimeoutError:
+        except (TimeoutError, asyncio.TimeoutError):
             duration_ms = int((time.monotonic() - start) * 1000)
             return [], FailedMerchant(slug=merchant.slug, reason="timeout", duration_ms=duration_ms)
         except Exception:
