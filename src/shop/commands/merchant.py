@@ -1,4 +1,4 @@
-"""shop merchant add — discover and register UCP-compatible merchants."""
+"""shop merchant — discover/register UCP merchants and connect Shopify Catalog."""
 
 from __future__ import annotations
 
@@ -52,7 +52,6 @@ def _check_ssrf(url: str) -> None:
             ip = ipaddress.ip_address(ip_str)
         except ValueError:
             continue
-        # For IPv4-mapped IPv6, check the underlying IPv4 address
         if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
             ip = ip.ipv4_mapped
         if ip.is_private or ip.is_loopback or ip.is_link_local:
@@ -60,51 +59,38 @@ def _check_ssrf(url: str) -> None:
 
 
 async def _discover_ucp_endpoint(base_url: str) -> tuple[str | None, str | None]:
-    """Return (ucp_endpoint, name) from well-known discovery, or (None, None)."""
+    """Return (ucp_endpoint, name) from /.well-known/ucp Business Profile, or (None, None)."""
     base = base_url.rstrip("/")
     async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
-        # 1. Try commerce.txt
         try:
-            r = await client.get(f"{base}/.well-known/commerce.txt")
+            r = await client.get(f"{base}/.well-known/ucp")
             if r.status_code == 200:
-                endpoint = None
-                name = None
-                for line in r.text.splitlines():
-                    line = line.strip()
-                    if line.startswith("UCP-Endpoint:"):
-                        endpoint = line.split(":", 1)[1].strip()
-                    elif line.startswith("Name:"):
-                        name = line.split(":", 1)[1].strip()
-                if endpoint:
-                    return endpoint, name
-        except (httpx.TimeoutException, httpx.RequestError):
-            pass
+                profile = r.json()
+                ucp = profile.get("ucp", {})
 
-        # 2. Try ucp.json
-        try:
-            r = await client.get(f"{base}/.well-known/ucp.json")
-            if r.status_code == 200:
-                data = r.json()
-                endpoint = data.get("ucp_endpoint")
-                name = data.get("name")
+                # Extract first REST transport endpoint
+                endpoint = None
+                for svc in ucp.get("services", []):
+                    for transport in svc.get("transports", []):
+                        if transport.get("type") == "rest" and transport.get("endpoint"):
+                            endpoint = transport["endpoint"].rstrip("/")
+                            break
+                    if endpoint:
+                        break
+
+                # Fall back to top-level ucp_endpoint for non-spec implementations
+                if not endpoint:
+                    endpoint = ucp.get("endpoint") or profile.get("ucp_endpoint")
+                    if endpoint:
+                        endpoint = endpoint.rstrip("/")
+
+                name = profile.get("name") or ucp.get("name")
                 if endpoint:
                     return endpoint, name
         except (httpx.TimeoutException, httpx.RequestError, ValueError):
             pass
 
     return None, None
-
-
-async def _health_check(ucp_endpoint: str) -> str | None:
-    """Return warning string if health check fails, None on success."""
-    try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            r = await client.get(f"{ucp_endpoint.rstrip('/')}/capabilities")
-            if r.status_code == 200:
-                return None
-    except Exception:
-        pass
-    return "health check failed — endpoint may be unreliable"
 
 
 def _save_merchant(merchant_data: dict, merchants_path: Path) -> None:
@@ -117,7 +103,6 @@ def _save_merchant(merchant_data: dict, merchants_path: Path) -> None:
             data = yaml.safe_load(f) or {}
             existing = data.get("merchants", [])
 
-    # Upsert by slug
     slug = merchant_data["slug"]
     existing = [m for m in existing if m.get("slug") != slug]
     existing.append(merchant_data)
@@ -128,7 +113,6 @@ def _save_merchant(merchant_data: dict, merchants_path: Path) -> None:
 
 def _slug_from_url(url: str) -> str:
     hostname = urlparse(url).hostname or "unknown"
-    # Strip www. prefix, replace dots/underscores with dashes
     slug = hostname.removeprefix("www.")
     slug = slug.replace(".", "-").replace("_", "-")
     return slug
@@ -141,11 +125,9 @@ async def _run_merchant_add(url: str, merchants_path: Path) -> None:
     if not ucp_endpoint:
         _error(
             "merchant_not_discoverable",
-            f"No UCP endpoint found at {url}/.well-known/commerce.txt or /.well-known/ucp.json",
+            f"No UCP endpoint found at {url}/.well-known/ucp — merchant must publish a UCP Business Profile",
             4,
         )
-
-    warning = await _health_check(ucp_endpoint)
 
     slug = _slug_from_url(url)
     if name is None:
@@ -160,12 +142,7 @@ async def _run_merchant_add(url: str, merchants_path: Path) -> None:
     }
 
     _save_merchant(merchant_data, merchants_path)
-
-    result: dict = {"status": "added", "merchant": merchant_data}
-    if warning:
-        result["warning"] = warning
-
-    _emit(result, 0)
+    _emit({"status": "added", "merchant": merchant_data}, 0)
 
 
 def run_merchant_add_command(url: str, merchants_path: Path = MERCHANTS_PATH) -> None:
@@ -173,9 +150,77 @@ def run_merchant_add_command(url: str, merchants_path: Path = MERCHANTS_PATH) ->
     asyncio.run(_run_merchant_add(url, merchants_path))
 
 
+async def _run_merchant_connect_shopify(
+    client_id: str, client_secret: str, ships_to: str, merchants_path: Path
+) -> None:
+    """Validate Shopify Catalog credentials and save to merchants.yaml."""
+    # Verify credentials by obtaining a token
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            r = await client.post(
+                "https://api.shopify.com/auth/access_token",
+                json={
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "grant_type": "client_credentials",
+                },
+            )
+            if r.status_code == 401:
+                _error("auth_failed", "Invalid Shopify client_id or client_secret", 2)
+            r.raise_for_status()
+            token_data = r.json()
+    except SystemExit:
+        raise
+    except httpx.TimeoutException:
+        _error("network_error", "Timed out contacting Shopify auth endpoint", 6)
+    except Exception as e:
+        _error("network_error", f"Failed to validate Shopify credentials: {e}", 6)
+
+    scope = token_data.get("scope", "")
+    merchant_data = {
+        "slug": "shopify",
+        "name": "Shopify Global Catalog",
+        "adapter": "shopify_catalog",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "ships_to": ships_to,
+    }
+
+    _save_merchant(merchant_data, merchants_path)
+    _emit({
+        "status": "connected",
+        "merchant": {
+            "slug": "shopify",
+            "name": "Shopify Global Catalog",
+            "adapter": "shopify_catalog",
+            "ships_to": ships_to,
+            "scope": scope,
+        },
+    }, 0)
+
+
+def run_merchant_connect_shopify_command(
+    client_id: str,
+    client_secret: str,
+    ships_to: str,
+    merchants_path: Path = MERCHANTS_PATH,
+) -> None:
+    asyncio.run(_run_merchant_connect_shopify(client_id, client_secret, ships_to, merchants_path))
+
+
 @app.command("add")
 def merchant_add(
     url: str = typer.Argument(..., help="Merchant HTTPS URL"),
 ) -> None:
-    """Discover and register a UCP-compatible merchant."""
+    """Discover and register a UCP-compatible merchant via /.well-known/ucp."""
     run_merchant_add_command(url)
+
+
+@app.command("connect-shopify")
+def merchant_connect_shopify(
+    client_id: str = typer.Option(..., "--client-id", help="Shopify Dev Dashboard app client ID"),
+    client_secret: str = typer.Option(..., "--client-secret", help="Shopify Dev Dashboard app client secret"),
+    ships_to: str = typer.Option("US", "--ships-to", help="ISO 3166-1 alpha-2 country code for search results"),
+) -> None:
+    """Connect Shopify Global Catalog — one credential searches all Shopify merchants."""
+    run_merchant_connect_shopify_command(client_id, client_secret, ships_to)

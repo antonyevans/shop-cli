@@ -144,11 +144,23 @@ _COMMANDS = [
     {
         "noun": "merchant",
         "verb": "add",
-        "description": "Register a new UCP-compatible merchant by HTTPS URL",
+        "description": "Register a UCP-compatible merchant by HTTPS URL (discovers via /.well-known/ucp)",
         "flags": [
             {"name": "url", "type": "string", "required": True, "description": "Merchant HTTPS URL"},
         ],
         "exit_codes": [0, 1, 4],
+        "mutates": True,
+    },
+    {
+        "noun": "merchant",
+        "verb": "connect-shopify",
+        "description": "Connect Shopify Global Catalog — one credential searches all Shopify merchants",
+        "flags": [
+            {"name": "client-id", "type": "string", "required": True, "description": "Shopify Dev Dashboard app client ID"},
+            {"name": "client-secret", "type": "string", "required": True, "description": "Shopify Dev Dashboard app client secret"},
+            {"name": "ships-to", "type": "string", "required": False, "default": "US", "description": "ISO 3166-1 alpha-2 country code"},
+        ],
+        "exit_codes": [0, 2, 6],
         "mutates": True,
     },
     {

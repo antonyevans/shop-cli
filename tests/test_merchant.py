@@ -1,7 +1,7 @@
-"""Tests for shop merchant add command.
+"""Tests for shop merchant commands.
 
-Tests SSRF guard, UCP endpoint discovery, health check,
-merchants.yaml persistence, and CLI wiring.
+Tests SSRF guard, UCP Business Profile discovery (/.well-known/ucp),
+merchants.yaml persistence, CLI wiring, and Shopify Catalog connect.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import yaml
 from typer.testing import CliRunner
 
 from shop.cli import app
-from shop.commands.merchant import run_merchant_add_command
+from shop.commands.merchant import run_merchant_add_command, run_merchant_connect_shopify_command
 
 runner = CliRunner()
 
@@ -26,18 +26,37 @@ runner = CliRunner()
 # Helpers
 # ---------------------------------------------------------------------------
 
-# A fake public IP returned by monkeypatched getaddrinfo
 _PUBLIC_ADDR = [
     (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 0))
 ]
 
 
 def _mock_public_dns(monkeypatch):
-    """Patch getaddrinfo to return a public IP — bypasses SSRF block."""
     monkeypatch.setattr(
         socket, "getaddrinfo",
         lambda host, port, *args, **kwargs: _PUBLIC_ADDR,
     )
+
+
+def _ucp_profile(endpoint: str, name: str | None = None) -> dict:
+    """Build a minimal UCP Business Profile JSON response."""
+    profile: dict = {
+        "ucp": {
+            "version": "2026-01-23",
+            "services": [
+                {
+                    "id": "dev.ucp.shopping",
+                    "transports": [
+                        {"type": "rest", "endpoint": endpoint}
+                    ],
+                    "capabilities": ["dev.ucp.shopping.checkout"],
+                }
+            ],
+        }
+    }
+    if name:
+        profile["name"] = name
+    return profile
 
 
 # ---------------------------------------------------------------------------
@@ -85,28 +104,24 @@ class TestSSRFGuard:
 
     def test_loopback_localhost_exits_1(self, tmp_path, capsys):
         """localhost resolves to 127.0.0.1 — must be blocked."""
-        # Don't monkeypatch — let real DNS resolve localhost to 127.0.0.1
         with pytest.raises(SystemExit) as exc_info:
             run_merchant_add_command("https://localhost", tmp_path / "merchants.yaml")
         assert exc_info.value.code == 1
 
 
 # ---------------------------------------------------------------------------
-# Discovery
+# UCP Business Profile discovery
 # ---------------------------------------------------------------------------
 
 
 class TestDiscovery:
-    def test_commerce_txt_found(self, monkeypatch, tmp_path, capsys):
+    def test_ucp_profile_found(self, monkeypatch, tmp_path, capsys):
         _mock_public_dns(monkeypatch)
         with respx.mock:
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
+            respx.get("https://example.com/.well-known/ucp").mock(
                 return_value=httpx.Response(
-                    200, text="UCP-Endpoint: https://api.example.com/ucp\nName: Example Store\n"
+                    200, json=_ucp_profile("https://api.example.com/ucp", "Example Store")
                 )
-            )
-            respx.get("https://api.example.com/ucp/capabilities").mock(
-                return_value=httpx.Response(200, json={"search": True, "order_create": True})
             )
 
             with pytest.raises(SystemExit) as exc_info:
@@ -118,37 +133,10 @@ class TestDiscovery:
         assert data["merchant"]["ucp_endpoint"] == "https://api.example.com/ucp"
         assert data["merchant"]["name"] == "Example Store"
 
-    def test_ucp_json_fallback(self, monkeypatch, tmp_path, capsys):
-        """commerce.txt returns 404 → falls back to ucp.json."""
+    def test_ucp_profile_not_found_exits_4(self, monkeypatch, tmp_path, capsys):
         _mock_public_dns(monkeypatch)
         with respx.mock:
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
-                return_value=httpx.Response(404)
-            )
-            respx.get("https://example.com/.well-known/ucp.json").mock(
-                return_value=httpx.Response(
-                    200,
-                    json={"ucp_endpoint": "https://api.example.com/ucp/v2", "name": "Example v2"},
-                )
-            )
-            respx.get("https://api.example.com/ucp/v2/capabilities").mock(
-                return_value=httpx.Response(200, json={"search": True})
-            )
-
-            with pytest.raises(SystemExit) as exc_info:
-                run_merchant_add_command("https://example.com", tmp_path / "merchants.yaml")
-
-        assert exc_info.value.code == 0
-        data = json.loads(capsys.readouterr().out)
-        assert data["merchant"]["ucp_endpoint"] == "https://api.example.com/ucp/v2"
-
-    def test_both_not_found_exits_4(self, monkeypatch, tmp_path, capsys):
-        _mock_public_dns(monkeypatch)
-        with respx.mock:
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
-                return_value=httpx.Response(404)
-            )
-            respx.get("https://example.com/.well-known/ucp.json").mock(
+            respx.get("https://example.com/.well-known/ucp").mock(
                 return_value=httpx.Response(404)
             )
 
@@ -159,37 +147,28 @@ class TestDiscovery:
         data = json.loads(capsys.readouterr().out)
         assert data["error_code"] == "merchant_not_discoverable"
 
-    def test_commerce_txt_missing_endpoint_falls_back(self, monkeypatch, tmp_path, capsys):
-        """commerce.txt exists but has no UCP-Endpoint line → try ucp.json."""
+    def test_ucp_profile_missing_endpoint_exits_4(self, monkeypatch, tmp_path, capsys):
+        """Profile exists but has no services/transports → not discoverable."""
         _mock_public_dns(monkeypatch)
         with respx.mock:
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
-                return_value=httpx.Response(200, text="Name: Example Store\n")
-            )
-            respx.get("https://example.com/.well-known/ucp.json").mock(
-                return_value=httpx.Response(
-                    200, json={"ucp_endpoint": "https://api.example.com/v1"}
-                )
-            )
-            respx.get("https://api.example.com/v1/capabilities").mock(
-                return_value=httpx.Response(200, json={})
+            respx.get("https://example.com/.well-known/ucp").mock(
+                return_value=httpx.Response(200, json={"ucp": {"version": "2026-01-23", "services": []}})
             )
 
             with pytest.raises(SystemExit) as exc_info:
                 run_merchant_add_command("https://example.com", tmp_path / "merchants.yaml")
 
-        assert exc_info.value.code == 0
+        assert exc_info.value.code == 4
+        data = json.loads(capsys.readouterr().out)
+        assert data["error_code"] == "merchant_not_discoverable"
 
     def test_slug_derived_from_hostname(self, monkeypatch, tmp_path, capsys):
         _mock_public_dns(monkeypatch)
         with respx.mock:
-            respx.get("https://shop.acme.com/.well-known/commerce.txt").mock(
+            respx.get("https://shop.acme.com/.well-known/ucp").mock(
                 return_value=httpx.Response(
-                    200, text="UCP-Endpoint: https://api.acme.com/ucp\n"
+                    200, json=_ucp_profile("https://api.acme.com/ucp")
                 )
-            )
-            respx.get("https://api.acme.com/ucp/capabilities").mock(
-                return_value=httpx.Response(200, json={})
             )
 
             with pytest.raises(SystemExit):
@@ -201,13 +180,10 @@ class TestDiscovery:
     def test_www_stripped_from_slug(self, monkeypatch, tmp_path, capsys):
         _mock_public_dns(monkeypatch)
         with respx.mock:
-            respx.get("https://www.example.com/.well-known/commerce.txt").mock(
+            respx.get("https://www.example.com/.well-known/ucp").mock(
                 return_value=httpx.Response(
-                    200, text="UCP-Endpoint: https://api.example.com/ucp\n"
+                    200, json=_ucp_profile("https://api.example.com/ucp")
                 )
-            )
-            respx.get("https://api.example.com/ucp/capabilities").mock(
-                return_value=httpx.Response(200, json={})
             )
 
             with pytest.raises(SystemExit):
@@ -216,63 +192,21 @@ class TestDiscovery:
         data = json.loads(capsys.readouterr().out)
         assert data["merchant"]["slug"] == "example-com"
 
-
-# ---------------------------------------------------------------------------
-# Health check
-# ---------------------------------------------------------------------------
-
-
-class TestHealthCheck:
-    def test_health_check_pass_no_warning(self, monkeypatch, tmp_path, capsys):
+    def test_name_derived_from_slug_when_absent(self, monkeypatch, tmp_path, capsys):
+        """Profile with no name field → name derived from slug."""
         _mock_public_dns(monkeypatch)
         with respx.mock:
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
-                return_value=httpx.Response(200, text="UCP-Endpoint: https://api.example.com/ucp\n")
-            )
-            respx.get("https://api.example.com/ucp/capabilities").mock(
-                return_value=httpx.Response(200, json={"search": True})
+            respx.get("https://example.com/.well-known/ucp").mock(
+                return_value=httpx.Response(
+                    200, json=_ucp_profile("https://api.example.com/ucp")  # no name
+                )
             )
 
             with pytest.raises(SystemExit):
                 run_merchant_add_command("https://example.com", tmp_path / "merchants.yaml")
 
         data = json.loads(capsys.readouterr().out)
-        assert "warning" not in data
-
-    def test_health_check_500_adds_warning(self, monkeypatch, tmp_path, capsys):
-        _mock_public_dns(monkeypatch)
-        with respx.mock:
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
-                return_value=httpx.Response(200, text="UCP-Endpoint: https://api.example.com/ucp\n")
-            )
-            respx.get("https://api.example.com/ucp/capabilities").mock(
-                return_value=httpx.Response(500)
-            )
-
-            with pytest.raises(SystemExit) as exc_info:
-                run_merchant_add_command("https://example.com", tmp_path / "merchants.yaml")
-
-        assert exc_info.value.code == 0  # still added despite warning
-        data = json.loads(capsys.readouterr().out)
-        assert "warning" in data
-        assert "health check failed" in data["warning"]
-
-    def test_health_check_timeout_adds_warning(self, monkeypatch, tmp_path, capsys):
-        _mock_public_dns(monkeypatch)
-        with respx.mock:
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
-                return_value=httpx.Response(200, text="UCP-Endpoint: https://api.example.com/ucp\n")
-            )
-            respx.get("https://api.example.com/ucp/capabilities").mock(
-                side_effect=httpx.TimeoutException("timeout")
-            )
-
-            with pytest.raises(SystemExit) as exc_info:
-                run_merchant_add_command("https://example.com", tmp_path / "merchants.yaml")
-
-        assert exc_info.value.code == 0
-        data = json.loads(capsys.readouterr().out)
-        assert "warning" in data
+        assert data["merchant"]["name"] == "Example Com"
 
 
 # ---------------------------------------------------------------------------
@@ -287,11 +221,8 @@ class TestMerchantsYamlPersistence:
 
         _mock_public_dns(monkeypatch)
         with respx.mock:
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
-                return_value=httpx.Response(200, text="UCP-Endpoint: https://api.example.com/ucp\n")
-            )
-            respx.get("https://api.example.com/ucp/capabilities").mock(
-                return_value=httpx.Response(200, json={})
+            respx.get("https://example.com/.well-known/ucp").mock(
+                return_value=httpx.Response(200, json=_ucp_profile("https://api.example.com/ucp"))
             )
             with pytest.raises(SystemExit):
                 run_merchant_add_command("https://example.com", merchants_path)
@@ -303,13 +234,10 @@ class TestMerchantsYamlPersistence:
 
         _mock_public_dns(monkeypatch)
         with respx.mock:
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
+            respx.get("https://example.com/.well-known/ucp").mock(
                 return_value=httpx.Response(
-                    200, text="UCP-Endpoint: https://api.example.com/ucp\nName: Example Store\n"
+                    200, json=_ucp_profile("https://api.example.com/ucp", "Example Store")
                 )
-            )
-            respx.get("https://api.example.com/ucp/capabilities").mock(
-                return_value=httpx.Response(200, json={})
             )
             with pytest.raises(SystemExit):
                 run_merchant_add_command("https://example.com", merchants_path)
@@ -326,17 +254,13 @@ class TestMerchantsYamlPersistence:
 
     def test_appends_to_existing_merchants(self, monkeypatch, tmp_path, capsys):
         merchants_path = tmp_path / "merchants.yaml"
-        # Pre-seed with one merchant
         with merchants_path.open("w") as f:
             yaml.dump({"merchants": [{"slug": "existing", "name": "Existing", "adapter": "mock"}]}, f)
 
         _mock_public_dns(monkeypatch)
         with respx.mock:
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
-                return_value=httpx.Response(200, text="UCP-Endpoint: https://api.example.com/ucp\n")
-            )
-            respx.get("https://api.example.com/ucp/capabilities").mock(
-                return_value=httpx.Response(200, json={})
+            respx.get("https://example.com/.well-known/ucp").mock(
+                return_value=httpx.Response(200, json=_ucp_profile("https://api.example.com/ucp"))
             )
             with pytest.raises(SystemExit):
                 run_merchant_add_command("https://example.com", merchants_path)
@@ -349,7 +273,6 @@ class TestMerchantsYamlPersistence:
         assert "example-com" in slugs
 
     def test_duplicate_slug_is_upserted(self, monkeypatch, tmp_path, capsys):
-        """Re-adding the same URL updates the entry rather than duplicating it."""
         merchants_path = tmp_path / "merchants.yaml"
         with merchants_path.open("w") as f:
             yaml.dump(
@@ -358,13 +281,10 @@ class TestMerchantsYamlPersistence:
 
         _mock_public_dns(monkeypatch)
         with respx.mock:
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
+            respx.get("https://example.com/.well-known/ucp").mock(
                 return_value=httpx.Response(
-                    200, text="UCP-Endpoint: https://api.example.com/ucp\nName: New Name\n"
+                    200, json=_ucp_profile("https://api.example.com/ucp", "New Name")
                 )
-            )
-            respx.get("https://api.example.com/ucp/capabilities").mock(
-                return_value=httpx.Response(200, json={})
             )
             with pytest.raises(SystemExit):
                 run_merchant_add_command("https://example.com", merchants_path)
@@ -374,6 +294,74 @@ class TestMerchantsYamlPersistence:
 
         assert len(saved["merchants"]) == 1
         assert saved["merchants"][0]["name"] == "New Name"
+
+
+# ---------------------------------------------------------------------------
+# Shopify Catalog connect
+# ---------------------------------------------------------------------------
+
+
+class TestConnectShopify:
+    def test_connect_shopify_success(self, tmp_path, capsys):
+        merchants_path = tmp_path / "merchants.yaml"
+        with respx.mock:
+            respx.post("https://api.shopify.com/auth/access_token").mock(
+                return_value=httpx.Response(
+                    200,
+                    json={
+                        "access_token": "shpat_test",
+                        "scope": "read_global_api_catalog_search",
+                        "expires_in": 3600,
+                    },
+                )
+            )
+
+            with pytest.raises(SystemExit) as exc_info:
+                run_merchant_connect_shopify_command(
+                    "test_client_id", "test_secret", "US", merchants_path
+                )
+
+        assert exc_info.value.code == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["status"] == "connected"
+        assert data["merchant"]["adapter"] == "shopify_catalog"
+        assert data["merchant"]["ships_to"] == "US"
+
+    def test_connect_shopify_saves_credentials(self, tmp_path, capsys):
+        merchants_path = tmp_path / "merchants.yaml"
+        with respx.mock:
+            respx.post("https://api.shopify.com/auth/access_token").mock(
+                return_value=httpx.Response(
+                    200,
+                    json={"access_token": "shpat_test", "scope": "read_global_api_catalog_search", "expires_in": 3600},
+                )
+            )
+            with pytest.raises(SystemExit):
+                run_merchant_connect_shopify_command("cid", "csec", "GB", merchants_path)
+
+        with merchants_path.open() as f:
+            saved = yaml.safe_load(f)
+
+        m = saved["merchants"][0]
+        assert m["slug"] == "shopify"
+        assert m["adapter"] == "shopify_catalog"
+        assert m["client_id"] == "cid"
+        assert m["ships_to"] == "GB"
+
+    def test_connect_shopify_invalid_creds_exits_2(self, tmp_path, capsys):
+        with respx.mock:
+            respx.post("https://api.shopify.com/auth/access_token").mock(
+                return_value=httpx.Response(401)
+            )
+
+            with pytest.raises(SystemExit) as exc_info:
+                run_merchant_connect_shopify_command(
+                    "bad_id", "bad_secret", "US", tmp_path / "merchants.yaml"
+                )
+
+        assert exc_info.value.code == 2
+        data = json.loads(capsys.readouterr().out)
+        assert data["error_code"] == "auth_failed"
 
 
 # ---------------------------------------------------------------------------
@@ -401,13 +389,10 @@ class TestCLIWiring:
             patch("shop.commands.merchant.MERCHANTS_PATH", tmp_path / "merchants.yaml"),
             respx.mock,
         ):
-            respx.get("https://example.com/.well-known/commerce.txt").mock(
+            respx.get("https://example.com/.well-known/ucp").mock(
                 return_value=httpx.Response(
-                    200, text="UCP-Endpoint: https://api.example.com/ucp\n"
+                    200, json=_ucp_profile("https://api.example.com/ucp")
                 )
-            )
-            respx.get("https://api.example.com/ucp/capabilities").mock(
-                return_value=httpx.Response(200, json={})
             )
 
             result = runner.invoke(app, ["merchant", "add", "https://example.com"])
@@ -415,3 +400,25 @@ class TestCLIWiring:
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["status"] == "added"
+
+    def test_connect_shopify_via_cli(self, tmp_path):
+        with (
+            patch("shop.commands.merchant.MERCHANTS_PATH", tmp_path / "merchants.yaml"),
+            respx.mock,
+        ):
+            respx.post("https://api.shopify.com/auth/access_token").mock(
+                return_value=httpx.Response(
+                    200,
+                    json={"access_token": "tok", "scope": "read_global_api_catalog_search", "expires_in": 3600},
+                )
+            )
+
+            result = runner.invoke(app, [
+                "merchant", "connect-shopify",
+                "--client-id", "cid",
+                "--client-secret", "csec",
+            ])
+
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["status"] == "connected"
