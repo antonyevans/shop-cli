@@ -1,0 +1,96 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  # ── PyPI publish ────────────────────────────────────────────────────────────
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for OIDC trusted publishing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Build
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish
+        uses: pypa/gh-action-pypa-publish@release/v1
+        # Configure trusted publisher at pypi.org/manage/project/shop-cli/settings/publishing/
+        # Publisher: GitHub Actions · repo: antonyevans/shop-cli · workflow: release.yml
+
+  # ── Binaries ────────────────────────────────────────────────────────────────
+  binaries:
+    name: Build ${{ matrix.artifact }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: shop-linux-amd64
+            exe: shop-linux-amd64
+          - os: macos-13            # Intel runner
+            artifact: shop-darwin-amd64
+            exe: shop-darwin-amd64
+          - os: macos-latest        # Apple Silicon (M1+)
+            artifact: shop-darwin-arm64
+            exe: shop-darwin-arm64
+          - os: windows-latest
+            artifact: shop-windows-amd64
+            exe: shop-windows-amd64.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e . pyinstaller
+
+      - name: Build binary
+        run: >
+          pyinstaller
+          --onefile
+          --name ${{ matrix.exe }}
+          --collect-all shop
+          src/shop/cli.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.exe }}*
+
+  # ── GitHub Release ──────────────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    needs: [publish, binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
