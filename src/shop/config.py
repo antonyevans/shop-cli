@@ -23,8 +23,8 @@ class ShopConfig:
 class MerchantConfig:
     slug: str
     name: str
-    adapter: str  # "mock" | "shopify_storefront" | "stripe_demo"
-    extra: dict = field(default_factory=dict)  # adapter-specific keys
+    adapter: str  # "mock" | "ucp" | "shopify_storefront" | "stripe_demo"
+    extra: dict = field(default_factory=dict)  # adapter-specific keys (ucp_endpoint, etc.)
 
 
 def load_config(config_path: Path = CONFIG_PATH) -> ShopConfig:
@@ -64,9 +64,11 @@ def load_merchants(merchants_path: Path = MERCHANTS_PATH) -> list[MerchantConfig
 def create_adapter(merchant: MerchantConfig):
     """Instantiate the correct adapter for a merchant config."""
     from shop.adapters.mock import MockAdapter
+    from shop.adapters.ucp import UCPAdapter
 
     adapters = {
         "mock": MockAdapter,
+        "ucp": UCPAdapter,
     }
 
     cls = adapters.get(merchant.adapter)
