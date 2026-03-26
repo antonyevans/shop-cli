@@ -12,6 +12,13 @@ are never sent to Shopify directly.
 Config keys (from merchants.yaml extra fields):
   store_domain            — e.g. my-store.myshopify.com
   storefront_access_token — public Storefront API access token
+
+Payment credential compatibility:
+  This adapter requires raw card credentials (number, cvv, month, year)
+  stored in payment.yaml. Stripe Setup Intent credentials (type: "stripe")
+  are not yet supported for Shopify direct checkout — Shopify's vault
+  endpoint requires raw card details that Stripe does not expose.
+  Stripe credential support is planned for v1.
 """
 
 from __future__ import annotations
@@ -37,7 +44,7 @@ def _get_shop_dir() -> Path:
 
 
 def _load_payment_config(shop_dir: Path) -> dict:
-    """Load ~/.shop/payment.yaml. Raises AdapterError if missing or malformed."""
+    """Load ~/.shop/payment.yaml. Raises AdapterError if missing or incompatible."""
     payment_path = shop_dir / "payment.yaml"
     if not payment_path.exists():
         raise AdapterError(
@@ -53,6 +60,16 @@ def _load_payment_config(shop_dir: Path) -> dict:
 
     default_id = data.get("default", methods[0]["id"])
     method = next((m for m in methods if m["id"] == default_id), methods[0])
+
+    if method.get("type") == "stripe":
+        raise AdapterError(
+            "payment",
+            "Shopify direct checkout requires raw card credentials. "
+            "Stripe Setup Intent credentials (type: stripe) are not yet supported "
+            "for Shopify direct checkout — planned for v1. "
+            "Use a UCP merchant for agent checkout with Stripe credentials.",
+        )
+
     return method
 
 

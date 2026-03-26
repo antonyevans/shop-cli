@@ -164,6 +164,38 @@ _COMMANDS = [
         "mutates": True,
     },
     {
+        "noun": "payment",
+        "verb": "add",
+        "description": "Start Stripe card setup — returns a browser URL. Card details entered in Stripe, never by the agent.",
+        "flags": [
+            {"name": "label", "type": "string", "required": True, "description": "Name for this payment method"},
+            {"name": "email", "type": "string", "required": False, "description": "Customer email for Stripe records"},
+            {"name": "stripe-key", "type": "string", "required": False, "description": "Stripe secret key (or STRIPE_SECRET_KEY env var)"},
+        ],
+        "exit_codes": [0, 1, 2, 6],
+        "mutates": True,
+    },
+    {
+        "noun": "payment",
+        "verb": "confirm",
+        "description": "Poll Stripe until card setup completes, then store credentials locally (chmod 600).",
+        "flags": [
+            {"name": "session-id", "type": "string", "required": True, "description": "Stripe checkout session ID from `payment add`"},
+            {"name": "timeout", "type": "int", "required": False, "default": 300, "description": "Max seconds to wait"},
+            {"name": "stripe-key", "type": "string", "required": False, "description": "Stripe secret key (or STRIPE_SECRET_KEY env var)"},
+        ],
+        "exit_codes": [0, 1, 2, 6],
+        "mutates": True,
+    },
+    {
+        "noun": "payment",
+        "verb": "list",
+        "description": "List stored payment methods (no sensitive data — only last4, brand, expiry).",
+        "flags": [],
+        "exit_codes": [0],
+        "mutates": False,
+    },
+    {
         "noun": "history",
         "verb": None,
         "description": "View transaction history from local SQLite audit log. Note: no verb — this command is `shop history [flags]`.",
