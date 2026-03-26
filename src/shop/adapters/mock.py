@@ -146,6 +146,7 @@ class MockAdapter(MerchantAdapter):
         quantity: int,
         mandate_id: str,
         idempotency_key: str,
+        checkout_url: str | None = None,
     ) -> dict:
         import uuid
 

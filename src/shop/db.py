@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS cart_items (
     quantity       INTEGER DEFAULT 1,
     price_usd      REAL NOT NULL,
     added_at       INTEGER NOT NULL,
+    checkout_url   TEXT,
     PRIMARY KEY (session_id, sku)
 );
 CREATE TABLE IF NOT EXISTS mandate_spend (
@@ -45,4 +46,10 @@ def get_db(shop_dir: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.row_factory = sqlite3.Row
     conn.executescript(_SCHEMA)
+    # Migrate: add checkout_url to cart_items if upgrading from older schema
+    try:
+        conn.execute("ALTER TABLE cart_items ADD COLUMN checkout_url TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     return conn

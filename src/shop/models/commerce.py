@@ -56,6 +56,8 @@ class CommerceTXTProduct(BaseModel):
     trust: CommerceTXTTrust = Field(default_factory=CommerceTXTTrust)
     cached_at: str  # ISO8601
     tax_excluded: bool = True
+    checkout_url: str | None = None   # Shopify per-product checkout URL
+    variant_id: str | None = None     # Shopify variant GID (gid://shopify/ProductVariant/…)
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +97,8 @@ class SearchResult(BaseModel):
     rating: float | None = None
     review_count: int | None = None
     confidence: float
+    checkout_url: str | None = None
+    variant_id: str | None = None
     agent_summary: str | None = None
     confidence_explanation: ConfidenceExplanation | None = None
 
@@ -115,6 +119,8 @@ class SearchResult(BaseModel):
             rating=product.trust.seller_rating,
             review_count=product.trust.review_count,
             confidence=confidence,
+            checkout_url=product.checkout_url,
+            variant_id=product.variant_id,
             agent_summary=agent_summary,
             confidence_explanation=explanation,
         )

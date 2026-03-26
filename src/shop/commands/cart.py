@@ -43,7 +43,11 @@ async def _cart_add_async(
     idempotency_key: Optional[str],
     shop_dir: Path,
     merchants_path: Path,
+    price_usd_override: Optional[float] = None,
+    checkout_url: Optional[str] = None,
 ) -> None:
+    from shop.adapters.base import AdapterError, ProductNotFoundError
+
     merchant_slug = sku.split(":")[0]
     merchants = load_merchants(merchants_path)
     merchant = next((m for m in merchants if m.slug == merchant_slug), None)
@@ -51,12 +55,20 @@ async def _cart_add_async(
         _error("merchant_not_found", f"Merchant not configured: {merchant_slug}", 4)
 
     adapter = create_adapter(merchant)
+    product = None
     try:
         product = await adapter.get_product(sku)
-    except Exception as e:
-        _error("product_not_found", str(e), 4)
+    except (ProductNotFoundError, AdapterError):
+        if price_usd_override is None:
+            _error(
+                "product_not_found",
+                f"Cannot fetch product {sku} — provide --price-usd to add manually",
+                4,
+            )
 
-    price_usd = product.price * quantity
+    price_usd = (product.price * quantity) if product is not None else (price_usd_override * quantity)
+    if checkout_url is None and product is not None:
+        checkout_url = product.checkout_url
 
     if not session_id:
         session_id = f"sess_{uuid.uuid4().hex[:8]}"
@@ -105,10 +117,10 @@ async def _cart_add_async(
     conn = get_db(shop_dir)
     conn.execute(
         """
-        INSERT OR REPLACE INTO cart_items (session_id, sku, merchant, quantity, price_usd, added_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO cart_items (session_id, sku, merchant, quantity, price_usd, added_at, checkout_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (session_id, sku, merchant_slug, quantity, price_usd, now_ts),
+        (session_id, sku, merchant_slug, quantity, price_usd, now_ts, checkout_url),
     )
     conn.commit()
 
@@ -140,6 +152,8 @@ def cart_add(
     session_id: Optional[str] = typer.Option(None, "--session-id"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     idempotency_key: Optional[str] = typer.Option(None, "--idempotency-key"),
+    price_usd: Optional[float] = typer.Option(None, "--price-usd", help="Price override (required for catalog products that don't expose a detail endpoint)"),
+    checkout_url: Optional[str] = typer.Option(None, "--checkout-url", help="Shopify checkout URL from search results"),
     shop_dir: Path = SHOP_DIR,
     merchants_path: Path = MERCHANTS_PATH,
 ) -> None:
@@ -149,6 +163,8 @@ def cart_add(
         session_id=session_id,
         dry_run=dry_run,
         idempotency_key=idempotency_key,
+        price_usd_override=price_usd,
+        checkout_url=checkout_url,
         shop_dir=shop_dir,
         merchants_path=merchants_path,
     )
@@ -160,10 +176,15 @@ def run_cart_add_command(
     session_id: Optional[str] = None,
     dry_run: bool = False,
     idempotency_key: Optional[str] = None,
+    price_usd_override: Optional[float] = None,
+    checkout_url: Optional[str] = None,
     shop_dir: Path = SHOP_DIR,
     merchants_path: Path = MERCHANTS_PATH,
 ) -> None:
-    asyncio.run(_cart_add_async(sku, quantity, session_id, dry_run, idempotency_key, shop_dir, merchants_path))
+    asyncio.run(_cart_add_async(
+        sku, quantity, session_id, dry_run, idempotency_key,
+        shop_dir, merchants_path, price_usd_override, checkout_url,
+    ))
 
 
 @app.command("view")
@@ -187,7 +208,7 @@ def run_cart_view_command(session_id: Optional[str] = None, shop_dir: Path = SHO
         session_id = row["session_id"]
 
     items_rows = conn.execute(
-        "SELECT sku, merchant, quantity, price_usd FROM cart_items WHERE session_id = ?",
+        "SELECT sku, merchant, quantity, price_usd, checkout_url FROM cart_items WHERE session_id = ?",
         (session_id,),
     ).fetchall()
 
@@ -200,7 +221,11 @@ def run_cart_view_command(session_id: Optional[str] = None, shop_dir: Path = SHO
 
     from datetime import UTC, datetime
     items = [
-        {"sku": r["sku"], "merchant": r["merchant"], "quantity": r["quantity"], "price_usd": r["price_usd"]}
+        {
+            "sku": r["sku"], "merchant": r["merchant"],
+            "quantity": r["quantity"], "price_usd": r["price_usd"],
+            "checkout_url": r["checkout_url"],
+        }
         for r in items_rows
     ]
     cart_total = sum(i["price_usd"] for i in items)

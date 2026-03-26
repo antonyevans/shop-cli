@@ -216,6 +216,44 @@ def merchant_add(
     run_merchant_add_command(url)
 
 
+@app.command("add-shopify-store")
+def merchant_add_shopify_store(
+    store_domain: str = typer.Option(..., "--store-domain", help="e.g. my-store.myshopify.com"),
+    storefront_token: str = typer.Option(..., "--storefront-token", help="Storefront API access token from store admin"),
+    ships_to: str = typer.Option("US", "--ships-to", help="ISO 3166-1 alpha-2 country code"),
+) -> None:
+    """Register a specific Shopify store for headless checkout."""
+    run_merchant_add_shopify_store_command(store_domain, storefront_token, ships_to)
+
+
+def run_merchant_add_shopify_store_command(
+    store_domain: str,
+    storefront_token: str,
+    ships_to: str = "US",
+    merchants_path: Path = MERCHANTS_PATH,
+) -> None:
+    domain = store_domain.strip().removeprefix("https://").removeprefix("http://").rstrip("/")
+    slug = domain.replace(".", "-").replace("_", "-")
+
+    merchant_data = {
+        "slug": slug,
+        "name": domain,
+        "adapter": "shopify_storefront",
+        "store_domain": domain,
+        "storefront_access_token": storefront_token,
+        "ships_to": ships_to,
+    }
+    _save_merchant(merchant_data, merchants_path)
+    _emit({
+        "status": "added",
+        "merchant": {
+            "slug": slug,
+            "store_domain": domain,
+            "adapter": "shopify_storefront",
+        },
+    })
+
+
 @app.command("connect-shopify")
 def merchant_connect_shopify(
     client_id: str = typer.Option(..., "--client-id", help="Shopify Dev Dashboard app client ID"),

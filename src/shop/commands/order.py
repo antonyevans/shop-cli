@@ -37,6 +37,13 @@ def _error(error_code: str, detail: str, exit_code: int) -> None:
     _emit({"error_code": error_code, "detail": detail, "exit_code": exit_code}, exit_code)
 
 
+def _store_domain_from_url(checkout_url: str) -> str | None:
+    """Extract store domain (e.g. my-store.myshopify.com) from a Shopify checkout URL."""
+    from urllib.parse import urlparse
+    parsed = urlparse(checkout_url)
+    return parsed.hostname
+
+
 async def _place_one_order(
     sku: str,
     quantity: int,
@@ -44,6 +51,8 @@ async def _place_one_order(
     idempotency_key: str,
     shop_dir: Path,
     merchants_path: Path,
+    checkout_url: str | None = None,
+    price_usd_override: float | None = None,
 ) -> dict:
     merchant_slug = sku.split(":")[0]
     merchants = load_merchants(merchants_path)
@@ -52,10 +61,35 @@ async def _place_one_order(
         _error("merchant_not_found", f"Merchant not configured: {merchant_slug}", 4)
 
     mandate = load_mandate(mandate_id, shop_dir / "mandates")
+
+    # Route Shopify catalog SKUs to the per-store Storefront adapter
+    if merchant.adapter == "shopify_catalog" and checkout_url:
+        store_domain = _store_domain_from_url(checkout_url)
+        storefront_merchant = next(
+            (m for m in merchants
+             if m.adapter == "shopify_storefront" and m.extra.get("store_domain") == store_domain),
+            None,
+        )
+        if not storefront_merchant:
+            _error(
+                "store_not_registered",
+                f"Shopify store {store_domain} is not registered for checkout. "
+                f"Run: shop merchant add-shopify-store --store-domain {store_domain} --storefront-token TOKEN",
+                4,
+            )
+        merchant = storefront_merchant
+
     adapter = create_adapter(merchant)
 
-    product = await adapter.get_product(sku)
-    price_usd = product.price * quantity
+    # Get product price — use override if adapter can't fetch detail
+    if price_usd_override is not None:
+        price_usd = price_usd_override * quantity
+    else:
+        try:
+            product = await adapter.get_product(sku)
+            price_usd = product.price * quantity
+        except Exception:
+            _error("product_not_found", f"Cannot fetch price for {sku} — add to cart first or use --price-usd", 4)
 
     # Policy checks
     policy_err = check_mandate_policy(mandate, merchant_slug, None, price_usd)
@@ -101,7 +135,7 @@ async def _place_one_order(
 
     # Phase 2 — call merchant
     try:
-        result = await adapter.create_order(sku, quantity, mandate_id, idempotency_key)
+        result = await adapter.create_order(sku, quantity, mandate_id, idempotency_key, checkout_url=checkout_url)
     except CheckoutNotSupportedError:
         conn.execute("BEGIN")
         conn.execute("DELETE FROM mandate_spend WHERE order_id = ?", (order_id,))
@@ -230,7 +264,7 @@ async def _run_order_create(
             session_id = row["session_id"]
 
         items = conn.execute(
-            "SELECT sku, quantity, price_usd FROM cart_items WHERE session_id = ?",
+            "SELECT sku, quantity, price_usd, checkout_url FROM cart_items WHERE session_id = ?",
             (session_id,),
         ).fetchall()
         conn.close()
@@ -249,6 +283,8 @@ async def _run_order_create(
                 idempotency_key=item_ik,
                 shop_dir=shop_dir,
                 merchants_path=merchants_path,
+                checkout_url=item["checkout_url"],
+                price_usd_override=item["price_usd"] / item["quantity"],
             )
             orders.append(order)
             total_amount += order["price_usd"]

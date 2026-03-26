@@ -10,6 +10,7 @@ Search endpoint: https://discover.shopifyapps.com/global/v2/search
 
 from __future__ import annotations
 
+import re
 import time
 from datetime import UTC, datetime
 
@@ -144,7 +145,8 @@ class ShopifyCatalogAdapter(MerchantAdapter):
         }
 
     async def create_order(
-        self, sku: str, quantity: int, mandate_id: str, idempotency_key: str
+        self, sku: str, quantity: int, mandate_id: str, idempotency_key: str,
+        checkout_url: str | None = None,
     ) -> dict:
         raise CheckoutNotSupportedError(
             self.slug,
@@ -189,6 +191,24 @@ class ShopifyCatalogAdapter(MerchantAdapter):
         tags = raw.get("tags", [])
         certs = [t for t in tags if t.startswith("cert:")] or None
 
+        # Extract checkout URL and variant ID from variant data
+        checkout_url = variant.get("checkoutUrl") or variant.get("checkout_url")
+        variant_id: str | None = None
+        if checkout_url:
+            # Shopify cart URL format: https://store.myshopify.com/cart/VARIANT_ID:QTY
+            m = re.search(r"/cart/(\d+)(?::|$)", checkout_url)
+            if m:
+                variant_id = f"gid://shopify/ProductVariant/{m.group(1)}"
+        # Also try explicit variant ID fields
+        if not variant_id:
+            raw_vid = variant.get("id") or variant.get("variantId")
+            if raw_vid:
+                vid_str = str(raw_vid)
+                if vid_str.startswith("gid://"):
+                    variant_id = vid_str
+                elif vid_str.isdigit():
+                    variant_id = f"gid://shopify/ProductVariant/{vid_str}"
+
         return CommerceTXTProduct(
             sku=sku,
             title=title,
@@ -216,6 +236,8 @@ class ShopifyCatalogAdapter(MerchantAdapter):
             ),
             tax_excluded=True,
             cached_at=cached_at,
+            checkout_url=checkout_url,
+            variant_id=variant_id,
         )
 
     def _apply_filters(

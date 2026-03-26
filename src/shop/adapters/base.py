@@ -62,10 +62,13 @@ class MerchantAdapter(ABC):
         quantity: int,
         mandate_id: str,
         idempotency_key: str,
+        checkout_url: str | None = None,
     ) -> dict:
         """Submit an order.
 
         Returns an order result dict on success.
         Raises CheckoutNotSupportedError if adapter cannot process orders (→ exit 4).
         Raises AdapterError on network/auth failure.
+
+        checkout_url: optional Shopify checkout URL passed for storefront routing.
         """

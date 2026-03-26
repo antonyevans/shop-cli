@@ -17,6 +17,7 @@ from shop.commands.search import app as search_app
 from shop.commands.mandate import app as mandate_app
 from shop.commands.cart import app as cart_app
 from shop.commands.order import app as order_app
+from shop.commands.payment import app as payment_app
 from shop.commands.history import history_command
 
 try:
@@ -38,6 +39,7 @@ app.add_typer(schema_app, name="schema", help="Runtime self-description for agen
 app.add_typer(mandate_app, name="mandate", help="Spending authority management")
 app.add_typer(cart_app, name="cart", help="Cart management")
 app.add_typer(order_app, name="order", help="Create and track orders")
+app.add_typer(payment_app, name="payment", help="Manage payment methods for checkout")
 app.command("history")(history_command)
 
 

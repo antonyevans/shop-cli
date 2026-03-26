@@ -130,7 +130,8 @@ class UCPAdapter(MerchantAdapter):
         return {}
 
     async def create_order(
-        self, sku: str, quantity: int, mandate_id: str, idempotency_key: str
+        self, sku: str, quantity: int, mandate_id: str, idempotency_key: str,
+        checkout_url: str | None = None,
     ) -> dict:
         """Execute a UCP checkout: create session → complete session.
 
