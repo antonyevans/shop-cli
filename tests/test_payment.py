@@ -13,6 +13,7 @@ from shop.commands.payment import (
     run_payment_add_command,
     run_payment_confirm_command,
     run_payment_list_command,
+    run_payment_remove_command,
 )
 
 _STRIPE_API = "https://api.stripe.com/v1"
@@ -399,3 +400,82 @@ class TestPaymentList:
         data = json.loads(capsys.readouterr().out)
         assert data["count"] == 0
         assert data["pending_setups"] == 2
+
+
+_STRIPE_METHOD = {
+    "id": "pm_test_visa",
+    "label": "My Visa",
+    "type": "stripe",
+    "customer_id": "cus_test123",
+    "payment_method_id": "pm_test_visa",
+    "card_last4": "4242",
+    "card_brand": "visa",
+    "expiry": "12/2026",
+}
+_STRIPE_METHOD_2 = {
+    "id": "pm_test_mc",
+    "label": "My MC",
+    "type": "stripe",
+    "customer_id": "cus_test456",
+    "payment_method_id": "pm_test_mc",
+    "card_last4": "5555",
+    "card_brand": "mastercard",
+    "expiry": "6/2027",
+}
+
+
+class TestPaymentRemove:
+    def _write_methods(self, tmp_path, methods, default=None):
+        data = {
+            "default": default or (methods[0]["id"] if methods else None),
+            "methods": methods,
+            "pending": [],
+        }
+        p = tmp_path / "payment.yaml"
+        p.write_text(yaml.dump(data))
+        p.chmod(0o600)
+
+    def test_remove_existing_method(self, tmp_path, capsys):
+        self._write_methods(tmp_path, [_STRIPE_METHOD])
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_payment_remove_command(method_id="pm_test_visa", shop_dir=tmp_path)
+        assert exc_info.value.code == 0
+
+        out = json.loads(capsys.readouterr().out)
+        assert out["status"] == "removed"
+        assert out["remaining"] == 0
+
+        saved = yaml.safe_load((tmp_path / "payment.yaml").read_text())
+        assert saved["methods"] == []
+        assert saved["default"] is None
+
+    def test_remove_unknown_id_exits_1(self, tmp_path, capsys):
+        self._write_methods(tmp_path, [_STRIPE_METHOD])
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_payment_remove_command(method_id="pm_does_not_exist", shop_dir=tmp_path)
+        assert exc_info.value.code == 1
+        out = json.loads(capsys.readouterr().out)
+        assert out["error_code"] == "not_found"
+
+    def test_remove_default_promotes_next(self, tmp_path, capsys):
+        self._write_methods(tmp_path, [_STRIPE_METHOD, _STRIPE_METHOD_2], default="pm_test_visa")
+
+        with pytest.raises(SystemExit):
+            run_payment_remove_command(method_id="pm_test_visa", shop_dir=tmp_path)
+        capsys.readouterr()
+
+        saved = yaml.safe_load((tmp_path / "payment.yaml").read_text())
+        assert len(saved["methods"]) == 1
+        assert saved["default"] == "pm_test_mc"
+
+    def test_remove_non_default_keeps_default(self, tmp_path, capsys):
+        self._write_methods(tmp_path, [_STRIPE_METHOD, _STRIPE_METHOD_2], default="pm_test_visa")
+
+        with pytest.raises(SystemExit):
+            run_payment_remove_command(method_id="pm_test_mc", shop_dir=tmp_path)
+        capsys.readouterr()
+
+        saved = yaml.safe_load((tmp_path / "payment.yaml").read_text())
+        assert saved["default"] == "pm_test_visa"  # unchanged

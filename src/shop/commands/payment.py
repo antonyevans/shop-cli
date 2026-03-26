@@ -274,6 +274,31 @@ def run_payment_confirm_command(
     })
 
 
+@app.command("remove")
+def payment_remove(
+    method_id: str = typer.Option(..., "--id", help="Payment method ID to remove"),
+    shop_dir: Path = SHOP_DIR,
+) -> None:
+    """Remove a stored payment method."""
+    run_payment_remove_command(method_id=method_id, shop_dir=shop_dir)
+
+
+def run_payment_remove_command(method_id: str, shop_dir: Path = SHOP_DIR) -> None:
+    data = _load_payment_file(shop_dir)
+    before = len(data["methods"])
+    data["methods"] = [m for m in data["methods"] if m["id"] != method_id]
+
+    if len(data["methods"]) == before:
+        _error("not_found", f"No payment method with id '{method_id}'", 1)
+
+    # Reset default if the removed method was the default
+    if data.get("default") == method_id:
+        data["default"] = data["methods"][0]["id"] if data["methods"] else None
+
+    _save_payment_file(data, shop_dir)
+    _emit({"status": "removed", "method_id": method_id, "remaining": len(data["methods"])})
+
+
 @app.command("list")
 def payment_list(shop_dir: Path = SHOP_DIR) -> None:
     """List stored payment methods (no sensitive data exposed)."""

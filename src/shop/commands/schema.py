@@ -196,6 +196,16 @@ _COMMANDS = [
         "mutates": False,
     },
     {
+        "noun": "payment",
+        "verb": "remove",
+        "description": "Remove a stored payment method by ID.",
+        "flags": [
+            {"name": "id", "type": "string", "required": True, "description": "Payment method ID to remove"},
+        ],
+        "exit_codes": [0, 1],
+        "mutates": True,
+    },
+    {
         "noun": "history",
         "verb": None,
         "description": "View transaction history from local SQLite audit log. Note: no verb — this command is `shop history [flags]`.",

@@ -5,6 +5,13 @@ There are NO search or product detail endpoints in the spec.
 Product discovery is handled by ShopifyCatalogAdapter or other means.
 
 Endpoint reference: https://ucp.dev/2026-01-23/services/shopping/openapi.json
+
+Payment integration:
+  If ~/.shop/payment.yaml contains a Stripe credential (type: stripe),
+  its customer_id and payment_method_id are included in the checkout-session
+  body under a `payment` key. UCP merchants that support Stripe can use these
+  to charge the buyer directly. Merchants that don't support Stripe ignore the
+  field — it is always optional.
 """
 
 from __future__ import annotations
@@ -16,6 +23,7 @@ import uuid
 from pathlib import Path
 
 import httpx
+import yaml
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
@@ -33,6 +41,41 @@ _TIMEOUT = 5.0
 
 def _get_shop_dir() -> Path:
     return Path(os.environ["SHOP_HOME"]) if "SHOP_HOME" in os.environ else Path.home() / ".shop"
+
+
+def _load_stripe_payment(shop_dir: Path) -> dict | None:
+    """Return Stripe payment credentials from payment.yaml, or None if unavailable.
+
+    Only returns credentials if a confirmed Stripe method (type: stripe) exists.
+    Silently returns None if payment.yaml is missing, empty, or has no Stripe method.
+    """
+    payment_path = shop_dir / "payment.yaml"
+    if not payment_path.exists():
+        return None
+    try:
+        with payment_path.open() as f:
+            data = yaml.safe_load(f) or {}
+    except Exception:
+        return None
+
+    methods = data.get("methods", [])
+    if not methods:
+        return None
+
+    default_id = data.get("default")
+    method = (
+        next((m for m in methods if m["id"] == default_id), None)
+        or methods[0]
+    )
+    if method.get("type") != "stripe":
+        return None
+
+    customer_id = method.get("customer_id")
+    pm_id = method.get("payment_method_id")
+    if not customer_id or not pm_id:
+        return None
+
+    return {"stripe_customer_id": customer_id, "stripe_payment_method_id": pm_id}
 
 
 def _load_or_create_signing_key() -> ec.EllipticCurvePrivateKey:
@@ -144,10 +187,17 @@ class UCPAdapter(MerchantAdapter):
         raw_sku = sku.removeprefix(f"{self.slug}:")
 
         # Phase 1: create checkout session
-        session_body = json.dumps({
+        # Include Stripe payment credentials if available — UCP merchants that
+        # support Stripe use these to charge the buyer. Others ignore the field.
+        session_payload: dict = {
             "items": [{"sku": raw_sku, "quantity": quantity}],
             "mandate_id": mandate_id,
-        }, separators=(",", ":")).encode()
+        }
+        stripe_creds = _load_stripe_payment(_get_shop_dir())
+        if stripe_creds:
+            session_payload["payment"] = stripe_creds
+
+        session_body = json.dumps(session_payload, separators=(",", ":")).encode()
 
         try:
             async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
