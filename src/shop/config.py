@@ -70,7 +70,6 @@ def load_merchants(merchants_path: Path = MERCHANTS_PATH) -> list[MerchantConfig
 def create_adapter(merchant: MerchantConfig):
     """Instantiate the correct adapter for a merchant config."""
     from shop.adapters.acp import ACPAdapter
-    from shop.adapters.bolt import BoltAdapter
     from shop.adapters.mock import MockAdapter
     from shop.adapters.paypal_fastlane import PayPalFastlaneAdapter
     from shop.adapters.shopify_catalog import ShopifyCatalogAdapter
@@ -83,7 +82,6 @@ def create_adapter(merchant: MerchantConfig):
         "ucp": UCPAdapter,
         "acp": ACPAdapter,
         "paypal_fastlane": PayPalFastlaneAdapter,
-        "bolt": BoltAdapter,
         "shopify_catalog": ShopifyCatalogAdapter,
         "shopify_storefront": ShopifyStorefrontAdapter,
         "shopify_ucp": ShopifyUCPAdapter,

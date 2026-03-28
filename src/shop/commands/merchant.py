@@ -266,56 +266,6 @@ def merchant_add_paypal(
     run_merchant_add_paypal_command(merchant_name, client_id, client_secret, sandbox, currency)
 
 
-def run_merchant_add_bolt_command(
-    merchant_name: str,
-    api_key: str,
-    merchant_id: str,
-    sandbox: bool = False,
-    currency: str = "USD",
-    merchants_path: Path = MERCHANTS_PATH,
-) -> None:
-    """Register a Bolt-integrated merchant for headless agent checkout."""
-    slug = merchant_name.lower().replace(" ", "-").replace("_", "-")
-    merchant_data = {
-        "slug": slug,
-        "name": merchant_name,
-        "adapter": "bolt",
-        "bolt_api_key": api_key,
-        "bolt_merchant_id": merchant_id,
-        "bolt_sandbox": str(sandbox).lower(),
-        "currency": currency.upper(),
-    }
-    _save_merchant(merchant_data, merchants_path)
-    _emit(
-        {
-            "status": "added",
-            "merchant": {
-                "slug": slug,
-                "name": merchant_name,
-                "adapter": "bolt",
-                "sandbox": sandbox,
-                "currency": currency.upper(),
-            },
-        },
-        0,
-    )
-
-
-@app.command("add-bolt")
-def merchant_add_bolt(
-    merchant_name: str = typer.Option(..., "--name", help="Display name for this merchant"),
-    api_key: str = typer.Option(..., "--api-key", help="Bolt merchant API key"),
-    merchant_id: str = typer.Option(..., "--merchant-id", help="Bolt merchant ID"),
-    sandbox: bool = typer.Option(False, "--sandbox", help="Use Bolt sandbox"),
-    currency: str = typer.Option("USD", "--currency", help="ISO 4217 currency code"),
-) -> None:
-    """Register a Bolt-enabled merchant for headless agent checkout.
-
-    Requires Bolt merchant credentials from the Bolt merchant dashboard.
-    Payment token: run `shop payment add-bolt` first.
-    """
-    run_merchant_add_bolt_command(merchant_name, api_key, merchant_id, sandbox, currency)
-
 
 @app.command("add")
 def merchant_add(

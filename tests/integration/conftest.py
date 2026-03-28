@@ -7,7 +7,6 @@ Credential tiers (controlled by env vars — missing vars skip those tests):
   Tier 0: no credentials  → ACP stub, catalog search smoke test
   Tier 1: SHOP_STRIPE_SECRET_KEY  → ACP real-payment
   Tier 2: SHOP_PAYPAL_CLIENT_ID + SHOP_PAYPAL_CLIENT_SECRET  → PayPal sandbox
-          SHOP_BOLT_API_KEY + SHOP_BOLT_MERCHANT_ID  → Bolt sandbox
   Tier 3: SHOP_SHOPIFY_CLIENT_ID + SHOP_SHOPIFY_CLIENT_SECRET
            + SHOP_SHOPIFY_SHOP_PAY_TOKEN  → Shopify UCP
 

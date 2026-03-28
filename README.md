@@ -63,13 +63,6 @@ shop payment add-paypal-fastlane \
   --email buyer@example.com
 ```
 
-**Bolt** (works with Bolt-integrated merchants):
-```bash
-shop payment add-bolt \
-  --token BOLT_TOKEN \
-  --email buyer@example.com
-```
-
 ### 2. Connect a merchant
 
 **Shopify Global Catalog** — search across ~1M+ Shopify stores:
@@ -102,14 +95,6 @@ shop merchant add-paypal \
   --name "Acme Store" \
   --client-id PP_CLIENT_ID \
   --client-secret PP_CLIENT_SECRET
-```
-
-**Bolt merchant**:
-```bash
-shop merchant add-bolt \
-  --name "Acme Store" \
-  --api-key BOLT_API_KEY \
-  --merchant-id BOLT_MERCHANT_ID
 ```
 
 ### 3. Create a mandate
@@ -148,7 +133,6 @@ shop order create --from-cart --idempotency-key $(uuidgen) --yes
 | `stripe` | `shop payment add` → `shop payment confirm` | `ucp`, `acp` adapters |
 | `shop_pay` | `shop payment add-shop-pay` | `shopify_ucp` adapter |
 | `paypal_fastlane` | `shop payment add-paypal-fastlane` | `paypal_fastlane` adapter |
-| `bolt` | `shop payment add-bolt` | `bolt` adapter |
 | `credit_card` | `shop payment add-card` | `shopify_storefront` (dev/test only) |
 
 **Stripe flow:** `shop payment add` creates a Stripe Checkout Session and returns a browser URL. The user enters card details in Stripe's hosted page (PCI scope stays with Stripe). `shop payment confirm` polls until complete, then stores only opaque Stripe IDs.
@@ -170,7 +154,6 @@ shop payment remove --id pm_xxx
 | `shopify_storefront` | Shopify Storefront API | credit card | Per-store Shopify checkout |
 | `shopify_ucp` | Shopify UCP/MCP JSON-RPC | Shop Pay | Shopify stores (agent checkout) |
 | `paypal_fastlane` | PayPal Orders API v2 | PayPal Fastlane | PayPal-enabled merchants |
-| `bolt` | Bolt Commerce API | Bolt token | Bolt-integrated merchants |
 | `mock` | Deterministic fixtures | — | Dev / offline testing |
 
 ---
@@ -212,7 +195,6 @@ shop search products QUERY [--max-price FLOAT] [--min-rating FLOAT] [--in-stock-
 | `shop merchant add URL` | Discover and register UCP merchant via `/.well-known/ucp` |
 | `shop merchant add-acp URL [--acp-key KEY]` | Register ACP merchant via `/.well-known/acp` |
 | `shop merchant add-paypal --name N --client-id ID --client-secret S` | Register PayPal Fastlane merchant |
-| `shop merchant add-bolt --name N --api-key K --merchant-id ID` | Register Bolt merchant |
 | `shop merchant add-shopify-store --store-domain D --storefront-token T` | Register Shopify Storefront merchant |
 | `shop merchant add-shopify-checkout --store-domain D` | Register Shopify for agent UCP checkout |
 | `shop merchant connect-shopify --client-id ID --client-secret S` | Connect Shopify Global Catalog |
@@ -225,7 +207,6 @@ shop search products QUERY [--max-price FLOAT] [--min-rating FLOAT] [--in-stock-
 | `shop payment confirm --session-id ID --stripe-key SK` | Complete Stripe setup, store credentials |
 | `shop payment add-shop-pay --token T --email E` | Store Shop Pay token |
 | `shop payment add-paypal-fastlane --token T --email E` | Store PayPal Fastlane token |
-| `shop payment add-bolt --token T --email E` | Store Bolt payment token |
 | `shop payment add-card --number N ...` | Store raw card (DEV/TEST ONLY) |
 | `shop payment list` | List stored methods (no sensitive data) |
 | `shop payment remove --id ID` | Remove a payment method |
