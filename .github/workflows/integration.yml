@@ -1,0 +1,100 @@
+name: Integration Tests
+
+on:
+  # Run weekly — Mondays at 09:00 UTC
+  schedule:
+    - cron: "0 9 * * 1"
+
+  # Manual trigger from GitHub UI — lets you specify which tier to run
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: "Test filter (acp / shopify / paypal / bolt — leave empty for all)"
+        required: false
+        default: ""
+      tier:
+        description: "Credential tier (0=stub only, 1=+Stripe, 2=+PayPal+Bolt, 3=+ShopifyUCP)"
+        required: false
+        default: "2"
+
+jobs:
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    # Don't run on forks — secrets won't be set there anyway
+    if: github.repository == 'antonyevans/shop-cli'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Run integration tests
+        env:
+          # Tier 1: ACP real-payment
+          SHOP_STRIPE_SECRET_KEY: ${{ secrets.SHOP_STRIPE_SECRET_KEY }}
+
+          # Tier 2: Shopify Catalog (read-only search)
+          SHOP_SHOPIFY_CLIENT_ID: ${{ secrets.SHOP_SHOPIFY_CLIENT_ID }}
+          SHOP_SHOPIFY_CLIENT_SECRET: ${{ secrets.SHOP_SHOPIFY_CLIENT_SECRET }}
+
+          # Tier 3: Shopify UCP checkout
+          SHOP_SHOPIFY_SHOP_PAY_TOKEN: ${{ secrets.SHOP_SHOPIFY_SHOP_PAY_TOKEN }}
+
+          # Tier 2: PayPal sandbox
+          SHOP_PAYPAL_CLIENT_ID: ${{ secrets.SHOP_PAYPAL_CLIENT_ID }}
+          SHOP_PAYPAL_CLIENT_SECRET: ${{ secrets.SHOP_PAYPAL_CLIENT_SECRET }}
+          SHOP_PAYPAL_FASTLANE_TOKEN: ${{ secrets.SHOP_PAYPAL_FASTLANE_TOKEN }}
+
+          # Tier 2: Bolt sandbox
+          SHOP_BOLT_API_KEY: ${{ secrets.SHOP_BOLT_API_KEY }}
+          SHOP_BOLT_MERCHANT_ID: ${{ secrets.SHOP_BOLT_MERCHANT_ID }}
+          SHOP_BOLT_TOKEN: ${{ secrets.SHOP_BOLT_TOKEN }}
+
+        run: |
+          FILTER="${{ github.event.inputs.filter }}"
+          if [[ -n "$FILTER" ]]; then
+            ./scripts/run-integration-tests.sh "$FILTER"
+          else
+            ./scripts/run-integration-tests.sh
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            .pytest_cache/
+          retention-days: 30
+
+      - name: Create issue on failure
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `Integration test failure — ${new Date().toISOString().split('T')[0]}`;
+            const body = [
+              '## Integration test failure',
+              '',
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              '',
+              'Check which platform failed and whether:',
+              '- Sandbox credentials have expired',
+              '- A third-party API has changed',
+              '- An adapter needs updating',
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['integration-test-failure'],
+            });

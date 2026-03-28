@@ -36,25 +36,83 @@ Or download a self-contained binary from [Releases](https://github.com/antonyeva
 
 ## Quick start
 
-### 1. Connect a merchant
+### 1. Add a payment method
 
-**Shopify Global Catalog** — one credential searches ~1M+ Shopify stores:
+Choose the payment network that matches your merchants:
 
+**Stripe** (works with UCP and ACP merchants):
+```bash
+shop payment add --label "My Visa" --stripe-key sk_live_...
+# → opens browser URL for PCI-compliant card entry
+shop payment confirm --session-id cs_xxx --stripe-key sk_live_...
+```
+
+**Shop Pay** (works with Shopify UCP merchants):
+```bash
+shop payment add-shop-pay \
+  --token SHOP_PAY_TOKEN \
+  --email buyer@example.com \
+  --first-name Jane --last-name Smith \
+  --address1 "123 Main St" --city "Portland" --province OR --zip 97201
+```
+
+**PayPal Fastlane** (works with PayPal Fastlane merchants):
+```bash
+shop payment add-paypal-fastlane \
+  --token FASTLANE_TOKEN \
+  --email buyer@example.com
+```
+
+**Bolt** (works with Bolt-integrated merchants):
+```bash
+shop payment add-bolt \
+  --token BOLT_TOKEN \
+  --email buyer@example.com
+```
+
+### 2. Connect a merchant
+
+**Shopify Global Catalog** — search across ~1M+ Shopify stores:
 ```bash
 shop merchant connect-shopify \
   --client-id YOUR_CLIENT_ID \
   --client-secret YOUR_CLIENT_SECRET
 ```
 
-Get credentials at [partners.shopify.com](https://partners.shopify.com) → Apps → Create app → Catalog API.
+**Shopify UCP checkout** — agent checkout via Shop Pay at a specific Shopify store:
+```bash
+shop merchant add-shopify-checkout \
+  --store-domain my-store.myshopify.com
+# uses credentials from connect-shopify above
+```
 
-**UCP merchant** — any merchant that publishes a `/.well-known/ucp` Business Profile:
-
+**UCP merchant** — any merchant publishing `/.well-known/ucp`:
 ```bash
 shop merchant add https://store.example.com
 ```
 
-### 2. Create a mandate
+**ACP merchant** — Stripe Agentic Commerce Protocol endpoint:
+```bash
+shop merchant add-acp https://store.example.com [--acp-key KEY]
+```
+
+**PayPal Fastlane merchant**:
+```bash
+shop merchant add-paypal \
+  --name "Acme Store" \
+  --client-id PP_CLIENT_ID \
+  --client-secret PP_CLIENT_SECRET
+```
+
+**Bolt merchant**:
+```bash
+shop merchant add-bolt \
+  --name "Acme Store" \
+  --api-key BOLT_API_KEY \
+  --merchant-id BOLT_MERCHANT_ID
+```
+
+### 3. Create a mandate
 
 Mandates define what an agent is allowed to buy. They're Ed25519-signed YAML files stored in `~/.shop/mandates/`.
 
@@ -66,7 +124,7 @@ shop mandate create \
   --category-allow "office supplies,coffee"
 ```
 
-### 3. Search and buy
+### 4. Search and buy
 
 ```bash
 # Search
@@ -78,6 +136,42 @@ shop cart add --sku shopify:abc123 --quantity 2
 # Place order
 shop order create --from-cart --idempotency-key $(uuidgen) --yes
 ```
+
+---
+
+## Payment methods
+
+`shop` supports five payment credential types. Each is stored as an opaque token in `~/.shop/payment.yaml` — agents never see card numbers.
+
+| Type | Command | Works with |
+|------|---------|-----------|
+| `stripe` | `shop payment add` → `shop payment confirm` | `ucp`, `acp` adapters |
+| `shop_pay` | `shop payment add-shop-pay` | `shopify_ucp` adapter |
+| `paypal_fastlane` | `shop payment add-paypal-fastlane` | `paypal_fastlane` adapter |
+| `bolt` | `shop payment add-bolt` | `bolt` adapter |
+| `credit_card` | `shop payment add-card` | `shopify_storefront` (dev/test only) |
+
+**Stripe flow:** `shop payment add` creates a Stripe Checkout Session and returns a browser URL. The user enters card details in Stripe's hosted page (PCI scope stays with Stripe). `shop payment confirm` polls until complete, then stores only opaque Stripe IDs.
+
+```bash
+shop payment list   # view stored methods (last4/brand/expiry only)
+shop payment remove --id pm_xxx
+```
+
+---
+
+## Merchant adapters
+
+| Adapter | Protocol | Payment | Use for |
+|---------|----------|---------|---------|
+| `ucp` | UCP v1 REST | Stripe | UCP-compliant merchants |
+| `acp` | ACP REST | Stripe | ACP-spec merchants (Stripe/OpenAI standard) |
+| `shopify_catalog` | Shopify Catalog API | (search only) | Shopify product discovery |
+| `shopify_storefront` | Shopify Storefront API | credit card | Per-store Shopify checkout |
+| `shopify_ucp` | Shopify UCP/MCP JSON-RPC | Shop Pay | Shopify stores (agent checkout) |
+| `paypal_fastlane` | PayPal Orders API v2 | PayPal Fastlane | PayPal-enabled merchants |
+| `bolt` | Bolt Commerce API | Bolt token | Bolt-integrated merchants |
+| `mock` | Deterministic fixtures | — | Dev / offline testing |
 
 ---
 
@@ -109,29 +203,34 @@ shop search products QUERY [--max-price FLOAT] [--min-rating FLOAT] [--in-stock-
 }
 ```
 
-`--explain` adds a per-result `confidence_explanation` breakdown (see [Confidence scoring](#confidence-scoring)).
+`--explain` adds a per-result `confidence_explanation` breakdown.
 
-### `shop merchant add`
+### `shop merchant` commands
 
-Discover and register a UCP-compatible merchant.
+| Command | Description |
+|---------|-------------|
+| `shop merchant add URL` | Discover and register UCP merchant via `/.well-known/ucp` |
+| `shop merchant add-acp URL [--acp-key KEY]` | Register ACP merchant via `/.well-known/acp` |
+| `shop merchant add-paypal --name N --client-id ID --client-secret S` | Register PayPal Fastlane merchant |
+| `shop merchant add-bolt --name N --api-key K --merchant-id ID` | Register Bolt merchant |
+| `shop merchant add-shopify-store --store-domain D --storefront-token T` | Register Shopify Storefront merchant |
+| `shop merchant add-shopify-checkout --store-domain D` | Register Shopify for agent UCP checkout |
+| `shop merchant connect-shopify --client-id ID --client-secret S` | Connect Shopify Global Catalog |
 
-```
-shop merchant add URL
-```
+### `shop payment` commands
 
-Fetches `URL/.well-known/ucp`, validates the Business Profile, and saves to `~/.shop/merchants.yaml`.
-
-### `shop merchant connect-shopify`
-
-Connect Shopify Global Catalog (one credential, all Shopify merchants).
-
-```
-shop merchant connect-shopify --client-id ID --client-secret SECRET [--ships-to US]
-```
+| Command | Description |
+|---------|-------------|
+| `shop payment add --label L --stripe-key SK` | Start Stripe card setup (returns browser URL) |
+| `shop payment confirm --session-id ID --stripe-key SK` | Complete Stripe setup, store credentials |
+| `shop payment add-shop-pay --token T --email E` | Store Shop Pay token |
+| `shop payment add-paypal-fastlane --token T --email E` | Store PayPal Fastlane token |
+| `shop payment add-bolt --token T --email E` | Store Bolt payment token |
+| `shop payment add-card --number N ...` | Store raw card (DEV/TEST ONLY) |
+| `shop payment list` | List stored methods (no sensitive data) |
+| `shop payment remove --id ID` | Remove a payment method |
 
 ### `shop mandate create`
-
-Create a new spending mandate.
 
 ```
 shop mandate create \
@@ -239,7 +338,8 @@ max_workers: 10
 | Path | Purpose |
 |------|---------|
 | `~/.shop/config.yaml` | Global settings (threshold, max_workers, default mandate) |
-| `~/.shop/merchants.yaml` | Registered merchants |
+| `~/.shop/merchants.yaml` | Registered merchants and adapter credentials |
+| `~/.shop/payment.yaml` | Payment credentials (chmod 600) |
 | `~/.shop/mandates/` | Ed25519-signed mandate files |
 | `~/.shop/shop.db` | SQLite order history and cart state |
 | `~/.shop/keys/` | Ed25519 mandate key, P-256 UCP signing key |

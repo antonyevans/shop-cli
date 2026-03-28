@@ -208,6 +208,102 @@ def run_merchant_connect_shopify_command(
     asyncio.run(_run_merchant_connect_shopify(client_id, client_secret, ships_to, merchants_path))
 
 
+def run_merchant_add_paypal_command(
+    merchant_name: str,
+    client_id: str,
+    client_secret: str,
+    sandbox: bool = False,
+    currency: str = "USD",
+    merchants_path: Path = MERCHANTS_PATH,
+) -> None:
+    """Register a PayPal Fastlane merchant directly (no discovery URL needed)."""
+    slug = merchant_name.lower().replace(" ", "-").replace("_", "-")
+    merchant_data = {
+        "slug": slug,
+        "name": merchant_name,
+        "adapter": "paypal_fastlane",
+        "paypal_client_id": client_id,
+        "paypal_client_secret": client_secret,
+        "paypal_sandbox": str(sandbox).lower(),
+        "currency": currency.upper(),
+    }
+    _save_merchant(merchant_data, merchants_path)
+    _emit({
+        "status": "added",
+        "merchant": {
+            "slug": slug,
+            "name": merchant_name,
+            "adapter": "paypal_fastlane",
+            "sandbox": sandbox,
+            "currency": currency.upper(),
+        },
+    }, 0)
+
+
+@app.command("add-paypal")
+def merchant_add_paypal(
+    merchant_name: str = typer.Option(..., "--name", help="Display name for this merchant"),
+    client_id: str = typer.Option(..., "--client-id", help="PayPal app client ID"),
+    client_secret: str = typer.Option(..., "--client-secret", help="PayPal app client secret"),
+    sandbox: bool = typer.Option(False, "--sandbox", help="Use PayPal sandbox API"),
+    currency: str = typer.Option("USD", "--currency", help="ISO 4217 currency code"),
+) -> None:
+    """Register a PayPal-enabled merchant for Fastlane agent checkout.
+
+    Requires PayPal app credentials from the PayPal Developer Dashboard.
+    Payment token: run `shop payment add-paypal-fastlane` first.
+    """
+    run_merchant_add_paypal_command(merchant_name, client_id, client_secret, sandbox, currency)
+
+
+def run_merchant_add_bolt_command(
+    merchant_name: str,
+    api_key: str,
+    merchant_id: str,
+    sandbox: bool = False,
+    currency: str = "USD",
+    merchants_path: Path = MERCHANTS_PATH,
+) -> None:
+    """Register a Bolt-integrated merchant for headless agent checkout."""
+    slug = merchant_name.lower().replace(" ", "-").replace("_", "-")
+    merchant_data = {
+        "slug": slug,
+        "name": merchant_name,
+        "adapter": "bolt",
+        "bolt_api_key": api_key,
+        "bolt_merchant_id": merchant_id,
+        "bolt_sandbox": str(sandbox).lower(),
+        "currency": currency.upper(),
+    }
+    _save_merchant(merchant_data, merchants_path)
+    _emit({
+        "status": "added",
+        "merchant": {
+            "slug": slug,
+            "name": merchant_name,
+            "adapter": "bolt",
+            "sandbox": sandbox,
+            "currency": currency.upper(),
+        },
+    }, 0)
+
+
+@app.command("add-bolt")
+def merchant_add_bolt(
+    merchant_name: str = typer.Option(..., "--name", help="Display name for this merchant"),
+    api_key: str = typer.Option(..., "--api-key", help="Bolt merchant API key"),
+    merchant_id: str = typer.Option(..., "--merchant-id", help="Bolt merchant ID"),
+    sandbox: bool = typer.Option(False, "--sandbox", help="Use Bolt sandbox"),
+    currency: str = typer.Option("USD", "--currency", help="ISO 4217 currency code"),
+) -> None:
+    """Register a Bolt-enabled merchant for headless agent checkout.
+
+    Requires Bolt merchant credentials from the Bolt merchant dashboard.
+    Payment token: run `shop payment add-bolt` first.
+    """
+    run_merchant_add_bolt_command(merchant_name, api_key, merchant_id, sandbox, currency)
+
+
 @app.command("add")
 def merchant_add(
     url: str = typer.Argument(..., help="Merchant HTTPS URL"),
@@ -311,6 +407,77 @@ def run_merchant_add_shopify_checkout_command(
             "payment_handler": "dev.shopify.shop_pay",
         },
     })
+
+
+async def _discover_acp_endpoint(base_url: str) -> tuple[str | None, str | None]:
+    """Return (acp_endpoint, name) from /.well-known/acp, or (None, None)."""
+    base = base_url.rstrip("/")
+    async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
+        try:
+            r = await client.get(f"{base}/.well-known/acp")
+            if r.status_code == 200:
+                profile = r.json()
+                acp = profile.get("acp", {})
+                endpoint = acp.get("endpoint")
+                if endpoint:
+                    endpoint = endpoint.rstrip("/")
+                name = profile.get("name") or acp.get("name")
+                if endpoint:
+                    return endpoint, name
+        except (httpx.TimeoutException, httpx.RequestError, ValueError):
+            pass
+    return None, None
+
+
+async def _run_merchant_add_acp(url: str, acp_key: str, merchants_path: Path) -> None:
+    _check_ssrf(url)
+
+    acp_endpoint, name = await _discover_acp_endpoint(url)
+    if not acp_endpoint:
+        _error(
+            "merchant_not_discoverable",
+            f"No ACP endpoint found at {url}/.well-known/acp — merchant must publish an ACP discovery document",
+            4,
+        )
+
+    slug = _slug_from_url(url)
+    if name is None:
+        name = slug.replace("-", " ").title()
+
+    merchant_data: dict = {
+        "slug": slug,
+        "name": name,
+        "adapter": "acp",
+        "url": url,
+        "acp_endpoint": acp_endpoint,
+    }
+    if acp_key:
+        merchant_data["acp_key"] = acp_key
+
+    _save_merchant(merchant_data, merchants_path)
+    _emit({"status": "added", "merchant": merchant_data}, 0)
+
+
+def run_merchant_add_acp_command(
+    url: str,
+    acp_key: str = "",
+    merchants_path: Path = MERCHANTS_PATH,
+) -> None:
+    """Core merchant-add-acp logic — separated from CLI wiring for testability."""
+    asyncio.run(_run_merchant_add_acp(url, acp_key, merchants_path))
+
+
+@app.command("add-acp")
+def merchant_add_acp(
+    url: str = typer.Argument(..., help="Merchant HTTPS URL"),
+    acp_key: str = typer.Option("", "--acp-key", help="Merchant-issued ACP API key"),
+) -> None:
+    """Discover and register an ACP-compatible merchant via /.well-known/acp.
+
+    ACP (Agentic Commerce Protocol) merchants accept Stripe-backed agent checkout.
+    Requires a Stripe payment method: run `shop payment add` first.
+    """
+    run_merchant_add_acp_command(url, acp_key)
 
 
 @app.command("connect-shopify")

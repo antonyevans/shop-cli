@@ -37,6 +37,9 @@ packages = ["src/shop"]
 testpaths = ["tests"]
 asyncio_mode = "strict"
 addopts = "--tb=short"
+markers = [
+    "integration: real-credential tests — run with ./scripts/run-integration-tests.sh",
+]
 
 [tool.ruff]
 line-length = 100

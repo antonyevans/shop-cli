@@ -422,3 +422,99 @@ class TestCLIWiring:
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["status"] == "connected"
+
+
+# ---------------------------------------------------------------------------
+# ACP merchant discovery
+# ---------------------------------------------------------------------------
+
+def _acp_profile(endpoint: str, name: str | None = None) -> dict:
+    profile: dict = {
+        "version": "1.0",
+        "acp": {
+            "endpoint": endpoint,
+            "payment_handlers": ["stripe"],
+            "currency": "USD",
+        },
+    }
+    if name:
+        profile["name"] = name
+    return profile
+
+
+class TestMerchantAddACP:
+    def test_discovers_and_saves_acp_merchant(self, monkeypatch, tmp_path, capsys):
+        from shop.commands.merchant import run_merchant_add_acp_command
+        monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_ADDR)
+        merchants_path = tmp_path / "merchants.yaml"
+
+        with respx.mock:
+            respx.get("https://acp.example.com/.well-known/acp").mock(
+                return_value=httpx.Response(
+                    200, json=_acp_profile("https://acp.example.com/api/acp", "ACP Store")
+                )
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                run_merchant_add_acp_command(
+                    url="https://acp.example.com",
+                    acp_key="acp_key_test",
+                    merchants_path=merchants_path,
+                )
+
+        assert exc_info.value.code == 0
+        data = json.loads(capsys.readouterr().out)
+        assert data["status"] == "added"
+        assert data["merchant"]["adapter"] == "acp"
+        assert data["merchant"]["acp_endpoint"] == "https://acp.example.com/api/acp"
+        assert data["merchant"]["name"] == "ACP Store"
+
+    def test_saves_acp_key_in_merchant_config(self, monkeypatch, tmp_path, capsys):
+        from shop.commands.merchant import run_merchant_add_acp_command
+        monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_ADDR)
+        merchants_path = tmp_path / "merchants.yaml"
+
+        with respx.mock:
+            respx.get("https://acp.example.com/.well-known/acp").mock(
+                return_value=httpx.Response(
+                    200, json=_acp_profile("https://acp.example.com/api/acp")
+                )
+            )
+            with pytest.raises(SystemExit):
+                run_merchant_add_acp_command(
+                    url="https://acp.example.com",
+                    acp_key="my-secret-key",
+                    merchants_path=merchants_path,
+                )
+
+        saved = yaml.safe_load(merchants_path.read_text())
+        merchant = saved["merchants"][0]
+        assert merchant["acp_key"] == "my-secret-key"
+
+    def test_no_well_known_acp_exits_4(self, monkeypatch, tmp_path, capsys):
+        from shop.commands.merchant import run_merchant_add_acp_command
+        monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_ADDR)
+
+        with respx.mock:
+            respx.get("https://acp.example.com/.well-known/acp").mock(
+                return_value=httpx.Response(404)
+            )
+            with pytest.raises(SystemExit) as exc_info:
+                run_merchant_add_acp_command(
+                    url="https://acp.example.com",
+                    merchants_path=tmp_path / "merchants.yaml",
+                )
+
+        assert exc_info.value.code == 4
+        data = json.loads(capsys.readouterr().out)
+        assert data["error_code"] == "merchant_not_discoverable"
+
+    def test_ssrf_guard_applies_to_acp(self, tmp_path, capsys):
+        from shop.commands.merchant import run_merchant_add_acp_command
+        with pytest.raises(SystemExit) as exc_info:
+            run_merchant_add_acp_command(
+                url="http://acp.example.com",  # HTTP not HTTPS
+                merchants_path=tmp_path / "merchants.yaml",
+            )
+        assert exc_info.value.code == 1
+        data = json.loads(capsys.readouterr().out)
+        assert data["error_code"] == "invalid_url"

@@ -58,16 +58,34 @@ def _load_payment_config(shop_dir: Path) -> dict:
     if not methods:
         raise AdapterError("payment", "No payment methods in payment.yaml")
 
-    default_id = data.get("default", methods[0]["id"])
-    method = next((m for m in methods if m["id"] == default_id), methods[0])
+    # Prefer raw card methods (credit_card) — Stripe methods aren't usable for Shopify vault.
+    # Fall back to the configured default only if it's a raw card.
+    raw_card_methods = [m for m in methods if m.get("type", "credit_card") != "stripe"]
+    default_id = data.get("default")
+    method = (
+        next((m for m in raw_card_methods if m["id"] == default_id), None)
+        or (raw_card_methods[0] if raw_card_methods else None)
+    )
 
-    if method.get("type") == "stripe":
+    if method is None:
+        method_type = "stripe"  # fall through to the error below
+    else:
+        method_type = method.get("type", "credit_card")
+
+    if method_type == "stripe":
         raise AdapterError(
             "payment",
             "Shopify direct checkout requires raw card credentials. "
             "Stripe Setup Intent credentials (type: stripe) are not yet supported "
             "for Shopify direct checkout — planned for v1. "
-            "Use a UCP merchant for agent checkout with Stripe credentials.",
+            "Use `shop payment add-card` (dev/test) or a UCP merchant for Stripe credentials.",
+        )
+
+    # Expect raw card fields (type: credit_card — from shop payment add-card)
+    if not method.get("number"):
+        raise AdapterError(
+            "payment",
+            "Payment method is missing card number. Use `shop payment add-card` for Shopify checkout.",
         )
 
     return method

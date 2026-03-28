@@ -118,8 +118,10 @@ class ShopifyCatalogAdapter(MerchantAdapter):
             raise AdapterError(self.slug, str(e))
 
         now = datetime.now(UTC).isoformat()
+        # API returns a list directly (not wrapped in {"products": [...]})
+        raw_list = data if isinstance(data, list) else data.get("products", [])
         products = []
-        for raw in data.get("products", []):
+        for raw in raw_list:
             try:
                 normalized = self._normalize(raw, now)
                 if normalized:
@@ -173,21 +175,34 @@ class ShopifyCatalogAdapter(MerchantAdapter):
             return None
 
         variant = variants[0]
-        price_str = variant.get("price") or variant.get("price_usd", "0")
-        try:
-            price = float(price_str)
-        except (ValueError, TypeError):
-            price = 0.0
 
-        available = variant.get("available", True)
+        # Price: API returns {"amount": 1999, "currency": "USD"} in cents
+        price_field = variant.get("price", {})
+        if isinstance(price_field, dict):
+            price = price_field.get("amount", 0) / 100.0
+        else:
+            try:
+                price = float(price_field)
+            except (ValueError, TypeError):
+                price = 0.0
+
+        available = variant.get("availableForSale", variant.get("available", True))
         availability = "InStock" if available else "OutOfStock"
 
-        # Trust signals from vendor/merchant data
-        vendor = raw.get("vendor", "")
-        review_count = raw.get("reviews_count") or raw.get("review_count")
-        seller_rating = raw.get("seller_rating") or raw.get("rating")
+        # Trust signals: rating is {"rating": 4.8, "count": 181} on variant or product
+        rating_obj = variant.get("rating") or raw.get("rating") or {}
+        if isinstance(rating_obj, dict):
+            seller_rating = rating_obj.get("rating")
+            review_count = rating_obj.get("count")
+        else:
+            seller_rating = rating_obj if rating_obj else None
+            review_count = raw.get("reviews_count") or raw.get("review_count")
 
-        # Certifications from tags
+        # Vendor/merchant name from shop data on variant
+        shop_info = variant.get("shop", {})
+        vendor = shop_info.get("name", "") or raw.get("vendor", "")
+
+        # Certifications from tags (may not be present in v2 API)
         tags = raw.get("tags", [])
         certs = [t for t in tags if t.startswith("cert:")] or None
 
@@ -199,11 +214,11 @@ class ShopifyCatalogAdapter(MerchantAdapter):
             m = re.search(r"/cart/(\d+)(?::|$)", checkout_url)
             if m:
                 variant_id = f"gid://shopify/ProductVariant/{m.group(1)}"
-        # Also try explicit variant ID fields
+        # Also try explicit variant ID fields (strip ?shop=xxx suffix if present)
         if not variant_id:
             raw_vid = variant.get("id") or variant.get("variantId")
             if raw_vid:
-                vid_str = str(raw_vid)
+                vid_str = str(raw_vid).split("?")[0]  # strip ?shop=xxx
                 if vid_str.startswith("gid://"):
                     variant_id = vid_str
                 elif vid_str.isdigit():
