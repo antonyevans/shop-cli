@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
@@ -61,7 +61,7 @@ def run_history_command(
 
     orders = [
         {
-            "timestamp": datetime.fromtimestamp(row["timestamp"], tz=UTC).isoformat(),
+            "timestamp": datetime.fromtimestamp(row["timestamp"], tz=timezone.utc).isoformat(),
             "order_id": row["order_id"],
             "sku": row["sku"],
             "merchant": row["merchant"],

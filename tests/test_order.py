@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -36,7 +36,7 @@ def _make_product(price: float = 8.99) -> CommerceTXTProduct:
         shipping=CommerceTXTShipping(cost=0.00, window_days="2-4"),
         returns=CommerceTXTReturns(window_days=30),
         trust=CommerceTXTTrust(seller_rating=4.7, review_count=100),
-        cached_at=datetime.now(UTC).isoformat(),
+        cached_at=datetime.now(timezone.utc).isoformat(),
     )
 
 

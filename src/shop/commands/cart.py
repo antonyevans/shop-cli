@@ -249,7 +249,7 @@ def run_cart_view_command(session_id: str | None = None, shop_dir: Path = SHOP_D
 
     conn.close()
 
-    from datetime import UTC, datetime
+    from datetime import datetime, timezone
 
     items = [
         {
@@ -264,7 +264,7 @@ def run_cart_view_command(session_id: str | None = None, shop_dir: Path = SHOP_D
     cart_total = sum(i["price_usd"] for i in items)
     created_at = None
     if earliest and earliest["min_added"]:
-        created_at = datetime.fromtimestamp(earliest["min_added"], tz=UTC).isoformat()
+        created_at = datetime.fromtimestamp(earliest["min_added"], tz=timezone.utc).isoformat()
 
     _emit(
         {

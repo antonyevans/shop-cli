@@ -32,7 +32,7 @@ def _make_merchants_yaml(tmp_path: Path) -> Path:
 
 
 def _make_product(price: float = 8.99) -> CommerceTXTProduct:
-    from datetime import UTC, datetime
+    from datetime import datetime, timezone
 
     return CommerceTXTProduct(
         sku="mock:coffee-filters-100",
@@ -43,7 +43,7 @@ def _make_product(price: float = 8.99) -> CommerceTXTProduct:
         shipping=CommerceTXTShipping(cost=0.00, window_days="2-4", carrier="USPS"),
         returns=CommerceTXTReturns(window_days=30, condition="unopened", refund_timeline_days=5),
         trust=CommerceTXTTrust(seller_rating=4.7, review_count=312, certifications=[]),
-        cached_at=datetime.now(UTC).isoformat(),
+        cached_at=datetime.now(timezone.utc).isoformat(),
         price_history_30d={"min": 8.99, "max": 9.49},
     )
 

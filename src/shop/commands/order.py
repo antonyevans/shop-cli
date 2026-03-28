@@ -8,7 +8,7 @@ import sqlite3
 import sys
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
@@ -425,7 +425,7 @@ def run_order_status_command(order_id: str, shop_dir: Path = SHOP_DIR) -> None:
         except Exception:
             pass
 
-    created_at = datetime.fromtimestamp(row["timestamp"], tz=UTC).isoformat()
+    created_at = datetime.fromtimestamp(row["timestamp"], tz=timezone.utc).isoformat()
 
     _emit(
         {

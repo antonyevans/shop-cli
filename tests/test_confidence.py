@@ -6,7 +6,7 @@ Final score is tested for correct weighting and clamping.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -30,7 +30,7 @@ def _product(**kwargs) -> CommerceTXTProduct:
         returns=CommerceTXTReturns(window_days=30, condition="original", refund_timeline_days=5),
         trust=CommerceTXTTrust(seller_rating=4.7, review_count=100, certifications=["CPSC"]),
         price_history_30d={"min": 10.00, "max": 10.50},
-        cached_at=datetime.now(UTC).isoformat(),
+        cached_at=datetime.now(timezone.utc).isoformat(),
     )
     base.update(kwargs)
     return CommerceTXTProduct(**base)

@@ -9,7 +9,7 @@ Does NOT make any network calls.
 from __future__ import annotations
 
 import importlib.resources
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -53,7 +53,7 @@ def _load_fixture(fixture_path: str | None = None) -> list[dict]:
 
 def _normalize(raw: dict, merchant_slug: str) -> CommerceTXTProduct:
     """Convert a fixture record to CommerceTXT format."""
-    now = datetime.now(UTC).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     shipping_raw = raw.get("shipping") or {}
     returns_raw = raw.get("returns") or {}

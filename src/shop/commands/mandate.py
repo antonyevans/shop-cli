@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sys
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
@@ -77,7 +77,7 @@ def run_mandate_create_command(
         _error("invalid_period", "period must be monthly, weekly, or one-time", 1)
 
     mandate_id = str(uuid.uuid4())
-    now_iso = datetime.now(UTC).isoformat()
+    now_iso = datetime.now(timezone.utc).isoformat()
 
     def _split(s: str | None) -> list[str]:
         if not s:
@@ -259,7 +259,7 @@ def run_mandate_usage_command(mandate_id: str | None, shop_dir: Path = SHOP_DIR)
             "amount": round(row["amount_usd"], 2),
             "merchant": row["merchant"],
             "status": row["status"],
-            "created_at": datetime.fromtimestamp(row["timestamp"], tz=UTC).isoformat(),
+            "created_at": datetime.fromtimestamp(row["timestamp"], tz=timezone.utc).isoformat(),
         }
         for row in pending_rows
     ]

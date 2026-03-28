@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 import httpx
 
@@ -126,7 +126,7 @@ class ShopifyCatalogAdapter(MerchantAdapter):
         except Exception as e:
             raise AdapterError(self.slug, str(e))
 
-        now = datetime.now(UTC).isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         # API returns a list directly (not wrapped in {"products": [...]})
         raw_list = data if isinstance(data, list) else data.get("products", [])
         products = []

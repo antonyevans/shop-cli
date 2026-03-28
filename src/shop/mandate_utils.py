@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import sqlite3
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -97,7 +97,7 @@ def list_mandates(mandates_dir: Path) -> list[dict]:
 
 
 def compute_period_start(period: str) -> int:
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     if period == "monthly":
         first = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         return int(first.timestamp())
@@ -133,7 +133,7 @@ def is_mandate_expired(mandate: dict) -> bool:
         return False
     try:
         expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
-        return datetime.now(UTC) > expiry
+        return datetime.now(timezone.utc) > expiry
     except Exception:
         return False
 
