@@ -41,14 +41,16 @@ def _write_bolt_payment(
     method_id = "bolt_test01"
     data = {
         "default": method_id,
-        "methods": [{
-            "id": method_id,
-            "label": "Bolt",
-            "type": "bolt",
-            "email": email,
-            "bolt_token": token,
-            "billing_address": {"country_code": "US"},
-        }],
+        "methods": [
+            {
+                "id": method_id,
+                "label": "Bolt",
+                "type": "bolt",
+                "email": email,
+                "bolt_token": token,
+                "billing_address": {"country_code": "US"},
+            }
+        ],
         "pending": [],
     }
     (tmp_path / "payment.yaml").write_text(yaml.dump(data))
@@ -67,6 +69,7 @@ def _success_response(reference: str = "BOLT-REF-001") -> dict:
 # ---------------------------------------------------------------------------
 # Unsupported operations
 # ---------------------------------------------------------------------------
+
 
 class TestUnsupportedOperations:
     @pytest.mark.asyncio
@@ -92,6 +95,7 @@ class TestUnsupportedOperations:
 # Bolt credential loading
 # ---------------------------------------------------------------------------
 
+
 class TestLoadBoltCredential:
     def test_returns_credential_when_present(self, tmp_path):
         _write_bolt_payment(tmp_path, token="bolt_tok_abc")
@@ -106,7 +110,14 @@ class TestLoadBoltCredential:
     def test_returns_none_when_only_stripe_method(self, tmp_path):
         data = {
             "default": "pm_1",
-            "methods": [{"id": "pm_1", "type": "stripe", "customer_id": "cus_x", "payment_method_id": "pm_x"}],
+            "methods": [
+                {
+                    "id": "pm_1",
+                    "type": "stripe",
+                    "customer_id": "cus_x",
+                    "payment_method_id": "pm_x",
+                }
+            ],
         }
         (tmp_path / "payment.yaml").write_text(yaml.dump(data))
         assert _load_bolt_credential(tmp_path) is None
@@ -128,6 +139,7 @@ class TestLoadBoltCredential:
 # Successful checkout
 # ---------------------------------------------------------------------------
 
+
 class TestCreateOrder:
     @pytest.mark.asyncio
     async def test_successful_checkout(self, tmp_path):
@@ -141,8 +153,10 @@ class TestCreateOrder:
                     return_value=httpx.Response(200, json=_success_response("BOLT-001"))
                 )
                 result = await adapter.create_order(
-                    sku=f"{_SLUG}:product-x", quantity=1,
-                    mandate_id="m-1", idempotency_key="idem-1",
+                    sku=f"{_SLUG}:product-x",
+                    quantity=1,
+                    mandate_id="m-1",
+                    idempotency_key="idem-1",
                 )
         finally:
             os.environ.pop("SHOP_HOME", None)
@@ -253,6 +267,7 @@ class TestCreateOrder:
 # Error cases
 # ---------------------------------------------------------------------------
 
+
 class TestErrorCases:
     @pytest.mark.asyncio
     async def test_missing_api_key_raises(self, tmp_path):
@@ -316,9 +331,12 @@ class TestErrorCases:
         try:
             with respx.mock:
                 respx.post(f"{_SANDBOX_BASE}/v1/account/checkout").mock(
-                    return_value=httpx.Response(200, json={
-                        "transaction": {"reference": "BOLT-HOLD", "status": "pending_review"}
-                    })
+                    return_value=httpx.Response(
+                        200,
+                        json={
+                            "transaction": {"reference": "BOLT-HOLD", "status": "pending_review"}
+                        },
+                    )
                 )
                 with pytest.raises(CheckoutNotSupportedError, match="review"):
                     await adapter.create_order(f"{_SLUG}:item", 1, "m", "k")
@@ -334,9 +352,16 @@ class TestErrorCases:
         try:
             with respx.mock:
                 respx.post(f"{_SANDBOX_BASE}/v1/account/checkout").mock(
-                    return_value=httpx.Response(200, json={
-                        "transaction": {"reference": "BOLT-FAIL", "status": "failed", "message": "Declined"}
-                    })
+                    return_value=httpx.Response(
+                        200,
+                        json={
+                            "transaction": {
+                                "reference": "BOLT-FAIL",
+                                "status": "failed",
+                                "message": "Declined",
+                            }
+                        },
+                    )
                 )
                 with pytest.raises(AdapterError, match="failed"):
                     await adapter.create_order(f"{_SLUG}:item", 1, "m", "k")
@@ -352,7 +377,9 @@ class TestErrorCases:
         try:
             with respx.mock:
                 respx.post(f"{_SANDBOX_BASE}/v1/account/checkout").mock(
-                    return_value=httpx.Response(200, json={"transaction": {"status": "completed"}})  # no reference
+                    return_value=httpx.Response(
+                        200, json={"transaction": {"status": "completed"}}
+                    )  # no reference
                 )
                 with pytest.raises(AdapterError, match="reference"):
                     await adapter.create_order(f"{_SLUG}:item", 1, "m", "k")

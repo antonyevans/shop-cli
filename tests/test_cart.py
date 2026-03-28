@@ -7,7 +7,6 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
-import yaml
 
 from shop.commands.cart import (
     run_cart_add_command,
@@ -27,16 +26,14 @@ from shop.models.commerce import (
 def _make_merchants_yaml(tmp_path: Path) -> Path:
     merchants_path = tmp_path / "merchants.yaml"
     merchants_path.write_text(
-        "merchants:\n"
-        "  - slug: mock\n"
-        "    name: Mock Store\n"
-        "    adapter: mock\n"
+        "merchants:\n  - slug: mock\n    name: Mock Store\n    adapter: mock\n"
     )
     return merchants_path
 
 
 def _make_product(price: float = 8.99) -> CommerceTXTProduct:
     from datetime import UTC, datetime
+
     return CommerceTXTProduct(
         sku="mock:coffee-filters-100",
         title="Premium Cone Coffee Filters, 100ct",
@@ -140,9 +137,7 @@ class TestCartAddCommit:
         capsys.readouterr()
 
         conn = get_db(shop_dir)
-        row = conn.execute(
-            "SELECT * FROM cart_items WHERE session_id = 'sess_test123'"
-        ).fetchone()
+        row = conn.execute("SELECT * FROM cart_items WHERE session_id = 'sess_test123'").fetchone()
         conn.close()
         assert row is not None
         assert row["sku"] == "mock:coffee-filters-100"

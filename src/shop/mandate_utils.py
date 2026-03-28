@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import base64
 import sqlite3
-import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 import yaml
 from canonicaljson import encode_canonical_json
@@ -56,11 +54,7 @@ def verify_mandate(mandate_data: dict) -> bool:
             return False
         sig_bytes = base64.b64decode(sig_b64)
         pub_bytes = base64.b64decode(pub_b64)
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-        from cryptography.hazmat.primitives.serialization import load_der_public_key
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as _Ed25519PK
         # Load raw public key bytes
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
         pub_key = _load_raw_ed25519_public_key(pub_bytes)
         to_verify = {k: v for k, v in mandate_data.items() if k not in ("signature", "public_key")}
         canonical = encode_canonical_json(to_verify)
@@ -72,6 +66,7 @@ def verify_mandate(mandate_data: dict) -> bool:
 
 def _load_raw_ed25519_public_key(raw_bytes: bytes) -> Ed25519PublicKey:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
     return Ed25519PublicKey.from_public_bytes(raw_bytes)
 
 
@@ -111,6 +106,7 @@ def compute_period_start(period: str) -> int:
         days_since_monday = now.weekday()
         monday = now.replace(hour=0, minute=0, second=0, microsecond=0)
         from datetime import timedelta
+
         monday = monday - timedelta(days=days_since_monday)
         return int(monday.timestamp())
     else:  # one-time
@@ -145,9 +141,9 @@ def is_mandate_expired(mandate: dict) -> bool:
 def check_mandate_policy(
     mandate: dict,
     merchant_slug: str,
-    category: Optional[str],
+    category: str | None,
     price: float,
-) -> Optional[str]:
+) -> str | None:
     # (a) expired
     if is_mandate_expired(mandate):
         return "mandate_expired"

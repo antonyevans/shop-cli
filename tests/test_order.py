@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import json
-import time
 from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
-import yaml
 
 from shop.commands.mandate import run_mandate_create_command
 from shop.commands.order import run_order_create_command, run_order_status_command
-from shop.db import get_db
 from shop.models.commerce import (
     CommerceTXTProduct,
     CommerceTXTReturns,
@@ -25,10 +22,7 @@ from shop.models.commerce import (
 def _make_merchants_yaml(tmp_path: Path) -> Path:
     merchants_path = tmp_path / "merchants.yaml"
     merchants_path.write_text(
-        "merchants:\n"
-        "  - slug: mock\n"
-        "    name: Mock Store\n"
-        "    adapter: mock\n"
+        "merchants:\n  - slug: mock\n    name: Mock Store\n    adapter: mock\n"
     )
     return merchants_path
 
@@ -89,7 +83,9 @@ class TestOrderCreateSuccess:
         product = _make_product(8.99)
         mock_adapter = AsyncMock()
         mock_adapter.get_product = AsyncMock(return_value=product)
-        mock_adapter.create_order = AsyncMock(return_value=_mock_order_result("mock:coffee-filters-100", 8.99))
+        mock_adapter.create_order = AsyncMock(
+            return_value=_mock_order_result("mock:coffee-filters-100", 8.99)
+        )
 
         with patch("shop.commands.order.create_adapter", return_value=mock_adapter):
             with pytest.raises(SystemExit) as exc:
@@ -123,7 +119,9 @@ class TestOrderMandateViolations:
         product = _make_product(8.99)
         mock_adapter = AsyncMock()
         mock_adapter.get_product = AsyncMock(return_value=product)
-        mock_adapter.create_order = AsyncMock(return_value=_mock_order_result("mock:coffee-filters-100", 8.99))
+        mock_adapter.create_order = AsyncMock(
+            return_value=_mock_order_result("mock:coffee-filters-100", 8.99)
+        )
 
         with patch("shop.commands.order.create_adapter", return_value=mock_adapter):
             with pytest.raises(SystemExit) as exc:
@@ -169,9 +167,7 @@ class TestOrderMandateViolations:
     def test_order_create_mandate_expired(self, tmp_path, capsys):
         shop_dir = tmp_path / "shop"
         merchants_path = _make_merchants_yaml(tmp_path)
-        mandate_id = _create_mandate(
-            tmp_path, capsys, expires_at="2020-01-01T00:00:00+00:00"
-        )
+        mandate_id = _create_mandate(tmp_path, capsys, expires_at="2020-01-01T00:00:00+00:00")
 
         product = _make_product(8.99)
         mock_adapter = AsyncMock()
@@ -218,7 +214,9 @@ class TestOrderValidation:
         product = _make_product(8.99)
         mock_adapter = AsyncMock()
         mock_adapter.get_product = AsyncMock(return_value=product)
-        mock_adapter.create_order = AsyncMock(return_value=_mock_order_result("mock:coffee-filters-100", 8.99))
+        mock_adapter.create_order = AsyncMock(
+            return_value=_mock_order_result("mock:coffee-filters-100", 8.99)
+        )
 
         with patch("shop.commands.order.create_adapter", return_value=mock_adapter):
             with pytest.raises(SystemExit) as exc:
@@ -261,7 +259,9 @@ class TestOrderStatus:
         product = _make_product(8.99)
         mock_adapter = AsyncMock()
         mock_adapter.get_product = AsyncMock(return_value=product)
-        mock_adapter.create_order = AsyncMock(return_value=_mock_order_result("mock:coffee-filters-100", 8.99))
+        mock_adapter.create_order = AsyncMock(
+            return_value=_mock_order_result("mock:coffee-filters-100", 8.99)
+        )
 
         with patch("shop.commands.order.create_adapter", return_value=mock_adapter):
             with pytest.raises(SystemExit):

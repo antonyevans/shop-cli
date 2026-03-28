@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import socket
-from pathlib import Path
 from unittest.mock import patch
 
 import httpx
@@ -26,14 +25,13 @@ runner = CliRunner()
 # Helpers
 # ---------------------------------------------------------------------------
 
-_PUBLIC_ADDR = [
-    (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 0))
-]
+_PUBLIC_ADDR = [(socket.AF_INET, socket.SOCK_STREAM, 0, "", ("93.184.216.34", 0))]
 
 
 def _mock_public_dns(monkeypatch):
     monkeypatch.setattr(
-        socket, "getaddrinfo",
+        socket,
+        "getaddrinfo",
         lambda host, port, *args, **kwargs: _PUBLIC_ADDR,
     )
 
@@ -46,9 +44,7 @@ def _ucp_profile(endpoint: str, name: str | None = None) -> dict:
             "services": [
                 {
                     "id": "dev.ucp.shopping",
-                    "transports": [
-                        {"type": "rest", "endpoint": endpoint}
-                    ],
+                    "transports": [{"type": "rest", "endpoint": endpoint}],
                     "capabilities": ["dev.ucp.shopping.checkout"],
                 }
             ],
@@ -136,9 +132,7 @@ class TestDiscovery:
     def test_ucp_profile_not_found_exits_4(self, monkeypatch, tmp_path, capsys):
         _mock_public_dns(monkeypatch)
         with respx.mock:
-            respx.get("https://example.com/.well-known/ucp").mock(
-                return_value=httpx.Response(404)
-            )
+            respx.get("https://example.com/.well-known/ucp").mock(return_value=httpx.Response(404))
 
             with pytest.raises(SystemExit) as exc_info:
                 run_merchant_add_command("https://example.com", tmp_path / "merchants.yaml")
@@ -152,7 +146,9 @@ class TestDiscovery:
         _mock_public_dns(monkeypatch)
         with respx.mock:
             respx.get("https://example.com/.well-known/ucp").mock(
-                return_value=httpx.Response(200, json={"ucp": {"version": "2026-01-23", "services": []}})
+                return_value=httpx.Response(
+                    200, json={"ucp": {"version": "2026-01-23", "services": []}}
+                )
             )
 
             with pytest.raises(SystemExit) as exc_info:
@@ -166,9 +162,7 @@ class TestDiscovery:
         _mock_public_dns(monkeypatch)
         with respx.mock:
             respx.get("https://shop.acme.com/.well-known/ucp").mock(
-                return_value=httpx.Response(
-                    200, json=_ucp_profile("https://api.acme.com/ucp")
-                )
+                return_value=httpx.Response(200, json=_ucp_profile("https://api.acme.com/ucp"))
             )
 
             with pytest.raises(SystemExit):
@@ -181,9 +175,7 @@ class TestDiscovery:
         _mock_public_dns(monkeypatch)
         with respx.mock:
             respx.get("https://www.example.com/.well-known/ucp").mock(
-                return_value=httpx.Response(
-                    200, json=_ucp_profile("https://api.example.com/ucp")
-                )
+                return_value=httpx.Response(200, json=_ucp_profile("https://api.example.com/ucp"))
             )
 
             with pytest.raises(SystemExit):
@@ -198,7 +190,8 @@ class TestDiscovery:
         with respx.mock:
             respx.get("https://example.com/.well-known/ucp").mock(
                 return_value=httpx.Response(
-                    200, json=_ucp_profile("https://api.example.com/ucp")  # no name
+                    200,
+                    json=_ucp_profile("https://api.example.com/ucp"),  # no name
                 )
             )
 
@@ -255,7 +248,9 @@ class TestMerchantsYamlPersistence:
     def test_appends_to_existing_merchants(self, monkeypatch, tmp_path, capsys):
         merchants_path = tmp_path / "merchants.yaml"
         with merchants_path.open("w") as f:
-            yaml.dump({"merchants": [{"slug": "existing", "name": "Existing", "adapter": "mock"}]}, f)
+            yaml.dump(
+                {"merchants": [{"slug": "existing", "name": "Existing", "adapter": "mock"}]}, f
+            )
 
         _mock_public_dns(monkeypatch)
         with respx.mock:
@@ -333,7 +328,11 @@ class TestConnectShopify:
             respx.post("https://api.shopify.com/auth/access_token").mock(
                 return_value=httpx.Response(
                     200,
-                    json={"access_token": "shpat_test", "scope": "read_global_api_catalog_search", "expires_in": 3600},
+                    json={
+                        "access_token": "shpat_test",
+                        "scope": "read_global_api_catalog_search",
+                        "expires_in": 3600,
+                    },
                 )
             )
             with pytest.raises(SystemExit):
@@ -382,7 +381,8 @@ class TestCLIWiring:
 
     def test_success_via_cli(self, monkeypatch, tmp_path):
         monkeypatch.setattr(
-            socket, "getaddrinfo",
+            socket,
+            "getaddrinfo",
             lambda host, port, *args, **kwargs: _PUBLIC_ADDR,
         )
         with (
@@ -390,9 +390,7 @@ class TestCLIWiring:
             respx.mock,
         ):
             respx.get("https://example.com/.well-known/ucp").mock(
-                return_value=httpx.Response(
-                    200, json=_ucp_profile("https://api.example.com/ucp")
-                )
+                return_value=httpx.Response(200, json=_ucp_profile("https://api.example.com/ucp"))
             )
 
             result = runner.invoke(app, ["merchant", "add", "https://example.com"])
@@ -409,15 +407,25 @@ class TestCLIWiring:
             respx.post("https://api.shopify.com/auth/access_token").mock(
                 return_value=httpx.Response(
                     200,
-                    json={"access_token": "tok", "scope": "read_global_api_catalog_search", "expires_in": 3600},
+                    json={
+                        "access_token": "tok",
+                        "scope": "read_global_api_catalog_search",
+                        "expires_in": 3600,
+                    },
                 )
             )
 
-            result = runner.invoke(app, [
-                "merchant", "connect-shopify",
-                "--client-id", "cid",
-                "--client-secret", "csec",
-            ])
+            result = runner.invoke(
+                app,
+                [
+                    "merchant",
+                    "connect-shopify",
+                    "--client-id",
+                    "cid",
+                    "--client-secret",
+                    "csec",
+                ],
+            )
 
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -427,6 +435,7 @@ class TestCLIWiring:
 # ---------------------------------------------------------------------------
 # ACP merchant discovery
 # ---------------------------------------------------------------------------
+
 
 def _acp_profile(endpoint: str, name: str | None = None) -> dict:
     profile: dict = {
@@ -445,6 +454,7 @@ def _acp_profile(endpoint: str, name: str | None = None) -> dict:
 class TestMerchantAddACP:
     def test_discovers_and_saves_acp_merchant(self, monkeypatch, tmp_path, capsys):
         from shop.commands.merchant import run_merchant_add_acp_command
+
         monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_ADDR)
         merchants_path = tmp_path / "merchants.yaml"
 
@@ -470,6 +480,7 @@ class TestMerchantAddACP:
 
     def test_saves_acp_key_in_merchant_config(self, monkeypatch, tmp_path, capsys):
         from shop.commands.merchant import run_merchant_add_acp_command
+
         monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_ADDR)
         merchants_path = tmp_path / "merchants.yaml"
 
@@ -492,6 +503,7 @@ class TestMerchantAddACP:
 
     def test_no_well_known_acp_exits_4(self, monkeypatch, tmp_path, capsys):
         from shop.commands.merchant import run_merchant_add_acp_command
+
         monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_ADDR)
 
         with respx.mock:
@@ -510,6 +522,7 @@ class TestMerchantAddACP:
 
     def test_ssrf_guard_applies_to_acp(self, tmp_path, capsys):
         from shop.commands.merchant import run_merchant_add_acp_command
+
         with pytest.raises(SystemExit) as exc_info:
             run_merchant_add_acp_command(
                 url="http://acp.example.com",  # HTTP not HTTPS

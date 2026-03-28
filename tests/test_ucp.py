@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 import os
+
+import httpx
 import pytest
 import respx
-import httpx
 import yaml
 
-from shop.adapters.ucp import UCPAdapter, _load_stripe_payment
 from shop.adapters.base import AdapterError, CheckoutNotSupportedError, ProductNotFoundError
+from shop.adapters.ucp import UCPAdapter, _load_stripe_payment
 from shop.models.commerce import SearchFilters
 
 _ENDPOINT = "https://merchant.example.com/ucp"
@@ -196,16 +197,18 @@ class TestStripeCredentialInjection:
     def _write_stripe_payment(self, tmp_path, customer_id="cus_abc", pm_id="pm_abc"):
         data = {
             "default": pm_id,
-            "methods": [{
-                "id": pm_id,
-                "label": "My Visa",
-                "type": "stripe",
-                "customer_id": customer_id,
-                "payment_method_id": pm_id,
-                "card_last4": "4242",
-                "card_brand": "visa",
-                "expiry": "12/2026",
-            }],
+            "methods": [
+                {
+                    "id": pm_id,
+                    "label": "My Visa",
+                    "type": "stripe",
+                    "customer_id": customer_id,
+                    "payment_method_id": pm_id,
+                    "card_last4": "4242",
+                    "card_brand": "visa",
+                    "expiry": "12/2026",
+                }
+            ],
             "pending": [],
         }
         p = tmp_path / "payment.yaml"
@@ -227,13 +230,17 @@ class TestStripeCredentialInjection:
         # Raw card format (old) — not a Stripe method
         data = {
             "default": "card_1",
-            "methods": [{
-                "id": "card_1",
-                "label": "Dev Card",
-                "type": "credit_card",
-                "number": "4242424242424242",
-                "month": 12, "year": 2026, "cvv": "123",
-            }],
+            "methods": [
+                {
+                    "id": "card_1",
+                    "label": "Dev Card",
+                    "type": "credit_card",
+                    "number": "4242424242424242",
+                    "month": 12,
+                    "year": 2026,
+                    "cvv": "123",
+                }
+            ],
         }
         (tmp_path / "payment.yaml").write_text(yaml.dump(data))
         assert _load_stripe_payment(tmp_path) is None

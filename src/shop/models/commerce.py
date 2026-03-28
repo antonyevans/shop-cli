@@ -11,7 +11,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # CommerceTXT sub-models
 # ---------------------------------------------------------------------------
@@ -56,8 +55,8 @@ class CommerceTXTProduct(BaseModel):
     trust: CommerceTXTTrust = Field(default_factory=CommerceTXTTrust)
     cached_at: str  # ISO8601
     tax_excluded: bool = True
-    checkout_url: str | None = None   # Shopify per-product checkout URL
-    variant_id: str | None = None     # Shopify variant GID (gid://shopify/ProductVariant/…)
+    checkout_url: str | None = None  # Shopify per-product checkout URL
+    variant_id: str | None = None  # Shopify variant GID (gid://shopify/ProductVariant/…)
 
 
 # ---------------------------------------------------------------------------

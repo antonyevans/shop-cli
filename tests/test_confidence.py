@@ -117,7 +117,9 @@ class TestSellerRating:
         assert exp.breakdown["seller_rating"].score == 0.0
 
     def test_none_scores_0_0(self):
-        p = _product(trust=CommerceTXTTrust(seller_rating=None, review_count=100, certifications=[]))
+        p = _product(
+            trust=CommerceTXTTrust(seller_rating=None, review_count=100, certifications=[])
+        )
         _, exp = score(p)
         assert exp.breakdown["seller_rating"].score == 0.0
 
@@ -130,7 +132,9 @@ class TestSellerRating:
 class TestReviewCount:
     def test_50_or_more_scores_1_0(self):
         for count in [50, 100, 1000]:
-            p = _product(trust=CommerceTXTTrust(seller_rating=4.5, review_count=count, certifications=[]))
+            p = _product(
+                trust=CommerceTXTTrust(seller_rating=4.5, review_count=count, certifications=[])
+            )
             _, exp = score(p)
             assert exp.breakdown["review_count"].score == 1.0, f"count={count}"
 
@@ -160,7 +164,9 @@ class TestReviewCount:
         assert exp.breakdown["review_count"].score == 0.0
 
     def test_none_scores_0_0(self):
-        p = _product(trust=CommerceTXTTrust(seller_rating=4.5, review_count=None, certifications=[]))
+        p = _product(
+            trust=CommerceTXTTrust(seller_rating=4.5, review_count=None, certifications=[])
+        )
         _, exp = score(p)
         assert exp.breakdown["review_count"].score == 0.0
 
@@ -172,17 +178,25 @@ class TestReviewCount:
 
 class TestReturnPolicy:
     def test_all_three_fields_scores_1_0(self):
-        p = _product(returns=CommerceTXTReturns(window_days=30, condition="original", refund_timeline_days=5))
+        p = _product(
+            returns=CommerceTXTReturns(window_days=30, condition="original", refund_timeline_days=5)
+        )
         _, exp = score(p)
         assert exp.breakdown["return_policy"].score == pytest.approx(1.0)
 
     def test_two_of_three_scores_0_667(self):
-        p = _product(returns=CommerceTXTReturns(window_days=30, condition="original", refund_timeline_days=None))
+        p = _product(
+            returns=CommerceTXTReturns(
+                window_days=30, condition="original", refund_timeline_days=None
+            )
+        )
         _, exp = score(p)
         assert exp.breakdown["return_policy"].score == pytest.approx(2 / 3, abs=1e-3)
 
     def test_one_of_three_scores_0_333(self):
-        p = _product(returns=CommerceTXTReturns(window_days=30, condition=None, refund_timeline_days=None))
+        p = _product(
+            returns=CommerceTXTReturns(window_days=30, condition=None, refund_timeline_days=None)
+        )
         _, exp = score(p)
         assert exp.breakdown["return_policy"].score == pytest.approx(1 / 3, abs=1e-3)
 
@@ -199,12 +213,18 @@ class TestReturnPolicy:
 
 class TestCertifications:
     def test_one_cert_scores_1_0(self):
-        p = _product(trust=CommerceTXTTrust(seller_rating=4.5, review_count=100, certifications=["CPSC"]))
+        p = _product(
+            trust=CommerceTXTTrust(seller_rating=4.5, review_count=100, certifications=["CPSC"])
+        )
         _, exp = score(p)
         assert exp.breakdown["certifications"].score == 1.0
 
     def test_multiple_certs_scores_1_0(self):
-        p = _product(trust=CommerceTXTTrust(seller_rating=4.5, review_count=100, certifications=["CPSC", "ASTM"]))
+        p = _product(
+            trust=CommerceTXTTrust(
+                seller_rating=4.5, review_count=100, certifications=["CPSC", "ASTM"]
+            )
+        )
         _, exp = score(p)
         assert exp.breakdown["certifications"].score == 1.0
 
@@ -214,7 +234,9 @@ class TestCertifications:
         assert exp.breakdown["certifications"].score == 0.5
 
     def test_none_scores_0_5(self):
-        p = _product(trust=CommerceTXTTrust(seller_rating=4.5, review_count=100, certifications=None))
+        p = _product(
+            trust=CommerceTXTTrust(seller_rating=4.5, review_count=100, certifications=None)
+        )
         _, exp = score(p)
         assert exp.breakdown["certifications"].score == 0.5
 
@@ -240,7 +262,10 @@ class TestPriceStability:
         p_volatile = _product(price_history_30d={"min": 10.0, "max": 13.0})
         _, exp_stable = score(p_stable)
         _, exp_volatile = score(p_volatile)
-        assert exp_volatile.breakdown["price_stability"].score < exp_stable.breakdown["price_stability"].score
+        assert (
+            exp_volatile.breakdown["price_stability"].score
+            < exp_stable.breakdown["price_stability"].score
+        )
 
     def test_no_history_scores_0_5(self):
         p = _product(price_history_30d=None)
@@ -274,12 +299,17 @@ class TestFinalScore:
         p = _product()
         _, exp = score(p)
         assert set(exp.breakdown.keys()) == {
-            "fields_completeness", "seller_rating", "review_count",
-            "return_policy", "certifications", "price_stability",
+            "fields_completeness",
+            "seller_rating",
+            "review_count",
+            "return_policy",
+            "certifications",
+            "price_stability",
         }
 
     def test_weights_sum_to_1(self):
         from shop.scoring import _WEIGHTS
+
         assert sum(_WEIGHTS.values()) == pytest.approx(1.0)
 
     def test_high_quality_product_above_0_80(self, full_product):

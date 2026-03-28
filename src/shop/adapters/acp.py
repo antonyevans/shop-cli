@@ -77,9 +77,8 @@ def _load_stripe_credential(shop_dir: Path) -> dict | None:
 
     default_id = data.get("default")
     stripe_methods = [m for m in methods if m.get("type") == "stripe"]
-    method = (
-        next((m for m in stripe_methods if m["id"] == default_id), None)
-        or (stripe_methods[0] if stripe_methods else None)
+    method = next((m for m in stripe_methods if m["id"] == default_id), None) or (
+        stripe_methods[0] if stripe_methods else None
     )
     if not method:
         return None
@@ -192,7 +191,11 @@ class ACPAdapter(MerchantAdapter):
                         self.slug, "Merchant ACP endpoint does not support checkout"
                     )
                 if r.status_code == 402:
-                    err = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+                    err = (
+                        r.json()
+                        if r.headers.get("content-type", "").startswith("application/json")
+                        else {}
+                    )
                     raise AdapterError(
                         self.slug,
                         f"Payment declined: {err.get('message', r.text or 'no details')}",

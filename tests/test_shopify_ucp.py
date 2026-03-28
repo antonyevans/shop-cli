@@ -4,19 +4,20 @@ from __future__ import annotations
 
 import json
 import os
+
+import httpx
 import pytest
 import respx
-import httpx
 import yaml
 
+from shop.adapters.base import AdapterError, CheckoutNotSupportedError, ProductNotFoundError
 from shop.adapters.shopify_ucp import (
+    _AUTH_URL,
+    _MCP_PATH,
     ShopifyUCPAdapter,
     _extract_variant_id,
     _load_shop_pay_credential,
-    _AUTH_URL,
-    _MCP_PATH,
 )
-from shop.adapters.base import AdapterError, CheckoutNotSupportedError, ProductNotFoundError
 from shop.models.commerce import SearchFilters
 
 _STORE = "shop-cli-test.myshopify.com"
@@ -75,22 +76,24 @@ def _rpc_error(code: int, message: str) -> dict:
 def _write_shop_pay(tmp_path, token=_SHOP_PAY_TOKEN, email="agent@shop-cli.dev"):
     data = {
         "default": "shoppay_test01",
-        "methods": [{
-            "id": "shoppay_test01",
-            "label": "Shop Pay",
-            "type": "shop_pay",
-            "email": email,
-            "shop_pay_token": token,
-            "billing_address": {
-                "first_name": "Test",
-                "last_name": "Agent",
-                "street_address": "1 Test St",
-                "address_locality": "Boston",
-                "address_region": "MA",
-                "postal_code": "02101",
-                "address_country": "US",
-            },
-        }],
+        "methods": [
+            {
+                "id": "shoppay_test01",
+                "label": "Shop Pay",
+                "type": "shop_pay",
+                "email": email,
+                "shop_pay_token": token,
+                "billing_address": {
+                    "first_name": "Test",
+                    "last_name": "Agent",
+                    "street_address": "1 Test St",
+                    "address_locality": "Boston",
+                    "address_region": "MA",
+                    "postal_code": "02101",
+                    "address_country": "US",
+                },
+            }
+        ],
         "pending": [],
     }
     p = tmp_path / "payment.yaml"
@@ -169,14 +172,14 @@ class TestCreateOrder:
                 respx.post(_AUTH_URL).mock(return_value=httpx.Response(200, json=_JWT_RESPONSE))
                 respx.post(_MCP_URL).mock(
                     side_effect=[
-                        httpx.Response(200, json=_rpc_response(_CREATE_RESPONSE)),   # create
-                        httpx.Response(200, json=_rpc_response(_UPDATE_RESPONSE)),   # update
-                        httpx.Response(200, json=_rpc_response(_COMPLETE_RESPONSE)), # complete
+                        httpx.Response(200, json=_rpc_response(_CREATE_RESPONSE)),  # create
+                        httpx.Response(200, json=_rpc_response(_UPDATE_RESPONSE)),  # update
+                        httpx.Response(200, json=_rpc_response(_COMPLETE_RESPONSE)),  # complete
                     ]
                 )
 
                 result = await adapter.create_order(
-                    sku=f"shop-cli-test-myshopify-com:62667067457907",
+                    sku="shop-cli-test-myshopify-com:62667067457907",
                     quantity=1,
                     mandate_id="m-123",
                     idempotency_key="idem-001",
@@ -257,12 +260,16 @@ class TestCreateOrder:
         finally:
             os.environ.pop("SHOP_HOME", None)
 
-        update_params = next(p["params"] for p in captured_params if p["method"] == "update_checkout")
+        update_params = next(
+            p["params"] for p in captured_params if p["method"] == "update_checkout"
+        )
         instruments = update_params["checkout"]["payment"]["instruments"]
         assert instruments[0]["credential"] == "spay_tok_mytoken"
         assert instruments[0]["type"] == "SHOP_PAY"
 
-        complete_params = next(p["params"] for p in captured_params if p["method"] == "complete_checkout")
+        complete_params = next(
+            p["params"] for p in captured_params if p["method"] == "complete_checkout"
+        )
         assert complete_params["payment"]["credential"] == "spay_tok_mytoken"
 
     @pytest.mark.asyncio
@@ -281,9 +288,14 @@ class TestCreateOrder:
                 return httpx.Response(200, json=_rpc_response(in_progress))
             if body["method"] == "get_checkout":
                 return httpx.Response(200, json=_rpc_response(_COMPLETE_RESPONSE))
-            return httpx.Response(200, json=_rpc_response(
-                {"create_checkout": _CREATE_RESPONSE, "update_checkout": _UPDATE_RESPONSE}[body["method"]]
-            ))
+            return httpx.Response(
+                200,
+                json=_rpc_response(
+                    {"create_checkout": _CREATE_RESPONSE, "update_checkout": _UPDATE_RESPONSE}[
+                        body["method"]
+                    ]
+                ),
+            )
 
         try:
             with respx.mock:
@@ -292,6 +304,7 @@ class TestCreateOrder:
 
                 # Patch sleep to avoid actual waiting
                 import shop.adapters.shopify_ucp as mod
+
                 original_sleep = mod._async_sleep
                 mod._async_sleep = lambda _: __import__("asyncio").sleep(0)
 
@@ -317,7 +330,11 @@ class TestCreateOrder:
         adapter = _make_adapter()
         os.environ["SHOP_HOME"] = str(tmp_path)
 
-        escalation = dict(_CREATE_RESPONSE, status="requires_escalation", continue_url="https://shop-cli-test.myshopify.com/checkout/abc")
+        escalation = dict(
+            _CREATE_RESPONSE,
+            status="requires_escalation",
+            continue_url="https://shop-cli-test.myshopify.com/checkout/abc",
+        )
 
         try:
             with respx.mock:

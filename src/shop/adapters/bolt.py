@@ -66,9 +66,8 @@ def _load_bolt_credential(shop_dir: Path) -> dict | None:
 
     default_id = data.get("default")
     bolt_methods = [m for m in methods if m.get("type") == "bolt"]
-    method = (
-        next((m for m in bolt_methods if m["id"] == default_id), None)
-        or (bolt_methods[0] if bolt_methods else None)
+    method = next((m for m in bolt_methods if m["id"] == default_id), None) or (
+        bolt_methods[0] if bolt_methods else None
     )
     if not method:
         return None

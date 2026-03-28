@@ -74,9 +74,8 @@ def create_adapter(merchant: MerchantConfig):
     from shop.adapters.paypal_fastlane import PayPalFastlaneAdapter
     from shop.adapters.shopify_catalog import ShopifyCatalogAdapter
     from shop.adapters.shopify_storefront import ShopifyStorefrontAdapter
-    from shop.adapters.ucp import UCPAdapter
-
     from shop.adapters.shopify_ucp import ShopifyUCPAdapter
+    from shop.adapters.ucp import UCPAdapter
 
     adapters = {
         "mock": MockAdapter,
@@ -91,6 +90,8 @@ def create_adapter(merchant: MerchantConfig):
 
     cls = adapters.get(merchant.adapter)
     if cls is None:
-        raise ValueError(f"Unknown adapter type: {merchant.adapter!r} for merchant {merchant.slug!r}")
+        raise ValueError(
+            f"Unknown adapter type: {merchant.adapter!r} for merchant {merchant.slug!r}"
+        )
 
     return cls(merchant.slug, merchant.extra)

@@ -14,7 +14,7 @@ import httpx
 import typer
 import yaml
 
-from shop.config import MERCHANTS_PATH, SHOP_DIR
+from shop.config import MERCHANTS_PATH
 
 _TIMEOUT = 3.0
 
@@ -55,7 +55,9 @@ def _check_ssrf(url: str) -> None:
         if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
             ip = ip.ipv4_mapped
         if ip.is_private or ip.is_loopback or ip.is_link_local:
-            _error("invalid_url", f"Private/loopback addresses not allowed (resolved to {ip_str})", 1)
+            _error(
+                "invalid_url", f"Private/loopback addresses not allowed (resolved to {ip_str})", 1
+            )
 
 
 async def _discover_ucp_endpoint(base_url: str) -> tuple[str | None, str | None]:
@@ -125,7 +127,8 @@ async def _run_merchant_add(url: str, merchants_path: Path) -> None:
     if not ucp_endpoint:
         _error(
             "merchant_not_discoverable",
-            f"No UCP endpoint found at {url}/.well-known/ucp — merchant must publish a UCP Business Profile",
+            f"No UCP endpoint found at {url}/.well-known/ucp"
+            " — merchant must publish a UCP Business Profile",
             4,
         )
 
@@ -187,16 +190,19 @@ async def _run_merchant_connect_shopify(
     }
 
     _save_merchant(merchant_data, merchants_path)
-    _emit({
-        "status": "connected",
-        "merchant": {
-            "slug": "shopify",
-            "name": "Shopify Global Catalog",
-            "adapter": "shopify_catalog",
-            "ships_to": ships_to,
-            "scope": scope,
+    _emit(
+        {
+            "status": "connected",
+            "merchant": {
+                "slug": "shopify",
+                "name": "Shopify Global Catalog",
+                "adapter": "shopify_catalog",
+                "ships_to": ships_to,
+                "scope": scope,
+            },
         },
-    }, 0)
+        0,
+    )
 
 
 def run_merchant_connect_shopify_command(
@@ -228,16 +234,19 @@ def run_merchant_add_paypal_command(
         "currency": currency.upper(),
     }
     _save_merchant(merchant_data, merchants_path)
-    _emit({
-        "status": "added",
-        "merchant": {
-            "slug": slug,
-            "name": merchant_name,
-            "adapter": "paypal_fastlane",
-            "sandbox": sandbox,
-            "currency": currency.upper(),
+    _emit(
+        {
+            "status": "added",
+            "merchant": {
+                "slug": slug,
+                "name": merchant_name,
+                "adapter": "paypal_fastlane",
+                "sandbox": sandbox,
+                "currency": currency.upper(),
+            },
         },
-    }, 0)
+        0,
+    )
 
 
 @app.command("add-paypal")
@@ -276,16 +285,19 @@ def run_merchant_add_bolt_command(
         "currency": currency.upper(),
     }
     _save_merchant(merchant_data, merchants_path)
-    _emit({
-        "status": "added",
-        "merchant": {
-            "slug": slug,
-            "name": merchant_name,
-            "adapter": "bolt",
-            "sandbox": sandbox,
-            "currency": currency.upper(),
+    _emit(
+        {
+            "status": "added",
+            "merchant": {
+                "slug": slug,
+                "name": merchant_name,
+                "adapter": "bolt",
+                "sandbox": sandbox,
+                "currency": currency.upper(),
+            },
         },
-    }, 0)
+        0,
+    )
 
 
 @app.command("add-bolt")
@@ -315,7 +327,9 @@ def merchant_add(
 @app.command("add-shopify-store")
 def merchant_add_shopify_store(
     store_domain: str = typer.Option(..., "--store-domain", help="e.g. my-store.myshopify.com"),
-    storefront_token: str = typer.Option(..., "--storefront-token", help="Storefront API access token from store admin"),
+    storefront_token: str = typer.Option(
+        ..., "--storefront-token", help="Storefront API access token from store admin"
+    ),
     ships_to: str = typer.Option("US", "--ships-to", help="ISO 3166-1 alpha-2 country code"),
 ) -> None:
     """Register a specific Shopify store for headless checkout."""
@@ -340,14 +354,16 @@ def run_merchant_add_shopify_store_command(
         "ships_to": ships_to,
     }
     _save_merchant(merchant_data, merchants_path)
-    _emit({
-        "status": "added",
-        "merchant": {
-            "slug": slug,
-            "store_domain": domain,
-            "adapter": "shopify_storefront",
-        },
-    })
+    _emit(
+        {
+            "status": "added",
+            "merchant": {
+                "slug": slug,
+                "store_domain": domain,
+                "adapter": "shopify_storefront",
+            },
+        }
+    )
 
 
 @app.command("add-shopify-checkout")
@@ -382,7 +398,8 @@ def run_merchant_add_shopify_checkout_command(
     if not client_id or not client_secret:
         _error(
             "catalog_not_connected",
-            "Shopify Catalog not connected. Run: shop merchant connect-shopify --client-id ... --client-secret ...",
+            "Shopify Catalog not connected."
+            " Run: shop merchant connect-shopify --client-id ... --client-secret ...",
             1,
         )
 
@@ -398,15 +415,17 @@ def run_merchant_add_shopify_checkout_command(
         "client_secret": client_secret,
     }
     _save_merchant(merchant_data, merchants_path)
-    _emit({
-        "status": "added",
-        "merchant": {
-            "slug": slug,
-            "store_domain": domain,
-            "adapter": "shopify_ucp",
-            "payment_handler": "dev.shopify.shop_pay",
-        },
-    })
+    _emit(
+        {
+            "status": "added",
+            "merchant": {
+                "slug": slug,
+                "store_domain": domain,
+                "adapter": "shopify_ucp",
+                "payment_handler": "dev.shopify.shop_pay",
+            },
+        }
+    )
 
 
 async def _discover_acp_endpoint(base_url: str) -> tuple[str | None, str | None]:
@@ -436,7 +455,8 @@ async def _run_merchant_add_acp(url: str, acp_key: str, merchants_path: Path) ->
     if not acp_endpoint:
         _error(
             "merchant_not_discoverable",
-            f"No ACP endpoint found at {url}/.well-known/acp — merchant must publish an ACP discovery document",
+            f"No ACP endpoint found at {url}/.well-known/acp"
+            " — merchant must publish an ACP discovery document",
             4,
         )
 
@@ -483,8 +503,12 @@ def merchant_add_acp(
 @app.command("connect-shopify")
 def merchant_connect_shopify(
     client_id: str = typer.Option(..., "--client-id", help="Shopify Dev Dashboard app client ID"),
-    client_secret: str = typer.Option(..., "--client-secret", help="Shopify Dev Dashboard app client secret"),
-    ships_to: str = typer.Option("US", "--ships-to", help="ISO 3166-1 alpha-2 country code for search results"),
+    client_secret: str = typer.Option(
+        ..., "--client-secret", help="Shopify Dev Dashboard app client secret"
+    ),
+    ships_to: str = typer.Option(
+        "US", "--ships-to", help="ISO 3166-1 alpha-2 country code for search results"
+    ),
 ) -> None:
     """Connect Shopify Global Catalog — one credential searches all Shopify merchants."""
     run_merchant_connect_shopify_command(client_id, client_secret, ships_to)

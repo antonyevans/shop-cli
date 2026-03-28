@@ -104,9 +104,7 @@ class MockAdapter(MerchantAdapter):
         super().__init__(slug, config)
         fixture_path = config.get("fixture_file")
         raw_products = _load_fixture(fixture_path)
-        self._products: list[CommerceTXTProduct] = [
-            _normalize(p, slug) for p in raw_products
-        ]
+        self._products: list[CommerceTXTProduct] = [_normalize(p, slug) for p in raw_products]
 
     async def search(self, query: str, filters: SearchFilters) -> list[CommerceTXTProduct]:
         query_lower = query.lower()

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-import time
-import pytest
+
 import httpx
+import pytest
 import respx
 import yaml
 
@@ -87,9 +87,7 @@ class TestPaymentAdd:
             )
 
             with pytest.raises(SystemExit):
-                run_payment_add_command(
-                    label="My Visa", stripe_key=_STRIPE_KEY, shop_dir=tmp_path
-                )
+                run_payment_add_command(label="My Visa", stripe_key=_STRIPE_KEY, shop_dir=tmp_path)
             capsys.readouterr()
 
         p = tmp_path / "payment.yaml"
@@ -112,15 +110,11 @@ class TestPaymentAdd:
     def test_add_stripe_api_error_exits_2(self, tmp_path, capsys):
         with respx.mock:
             respx.post(f"{_STRIPE_API}/customers").mock(
-                return_value=httpx.Response(
-                    401, json={"error": {"message": "Invalid API key"}}
-                )
+                return_value=httpx.Response(401, json={"error": {"message": "Invalid API key"}})
             )
 
             with pytest.raises(SystemExit) as exc_info:
-                run_payment_add_command(
-                    label="Card", stripe_key="sk_bad", shop_dir=tmp_path
-                )
+                run_payment_add_command(label="Card", stripe_key="sk_bad", shop_dir=tmp_path)
 
         assert exc_info.value.code == 2
         data = json.loads(capsys.readouterr().out)
@@ -265,9 +259,7 @@ class TestPaymentConfirm:
 
     def test_confirm_missing_stripe_key_exits_1(self, tmp_path, capsys):
         with pytest.raises(SystemExit) as exc_info:
-            run_payment_confirm_command(
-                session_id="cs_test_abc", stripe_key="", shop_dir=tmp_path
-            )
+            run_payment_confirm_command(session_id="cs_test_abc", stripe_key="", shop_dir=tmp_path)
         assert exc_info.value.code == 1
         data = json.loads(capsys.readouterr().out)
         assert data["error_code"] == "missing_stripe_key"
@@ -354,20 +346,26 @@ class TestPaymentList:
 
     def test_list_shows_stripe_method(self, tmp_path, capsys):
         p = tmp_path / "payment.yaml"
-        p.write_text(yaml.dump({
-            "default": "pm_test_visa",
-            "methods": [{
-                "id": "pm_test_visa",
-                "label": "My Visa",
-                "type": "stripe",
-                "customer_id": "cus_test123",
-                "payment_method_id": "pm_test_visa",
-                "card_last4": "4242",
-                "card_brand": "visa",
-                "expiry": "12/2026",
-            }],
-            "pending": [],
-        }))
+        p.write_text(
+            yaml.dump(
+                {
+                    "default": "pm_test_visa",
+                    "methods": [
+                        {
+                            "id": "pm_test_visa",
+                            "label": "My Visa",
+                            "type": "stripe",
+                            "customer_id": "cus_test123",
+                            "payment_method_id": "pm_test_visa",
+                            "card_last4": "4242",
+                            "card_brand": "visa",
+                            "expiry": "12/2026",
+                        }
+                    ],
+                    "pending": [],
+                }
+            )
+        )
         p.chmod(0o600)
 
         with pytest.raises(SystemExit):
@@ -385,14 +383,28 @@ class TestPaymentList:
 
     def test_list_counts_pending_setups(self, tmp_path, capsys):
         p = tmp_path / "payment.yaml"
-        p.write_text(yaml.dump({
-            "default": None,
-            "methods": [],
-            "pending": [
-                {"label": "Card 1", "session_id": "cs_1", "customer_id": "cus_1", "email": ""},
-                {"label": "Card 2", "session_id": "cs_2", "customer_id": "cus_2", "email": ""},
-            ],
-        }))
+        p.write_text(
+            yaml.dump(
+                {
+                    "default": None,
+                    "methods": [],
+                    "pending": [
+                        {
+                            "label": "Card 1",
+                            "session_id": "cs_1",
+                            "customer_id": "cus_1",
+                            "email": "",
+                        },
+                        {
+                            "label": "Card 2",
+                            "session_id": "cs_2",
+                            "customer_id": "cus_2",
+                            "email": "",
+                        },
+                    ],
+                }
+            )
+        )
         p.chmod(0o600)
 
         with pytest.raises(SystemExit):

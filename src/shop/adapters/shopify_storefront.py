@@ -23,7 +23,6 @@ Payment credential compatibility:
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from pathlib import Path
@@ -31,7 +30,11 @@ from pathlib import Path
 import httpx
 import yaml
 
-from shop.adapters.base import AdapterError, CheckoutNotSupportedError, MerchantAdapter, ProductNotFoundError
+from shop.adapters.base import (
+    AdapterError,
+    MerchantAdapter,
+    ProductNotFoundError,
+)
 from shop.models.commerce import CommerceTXTProduct, SearchFilters
 
 _TIMEOUT = 10.0
@@ -62,9 +65,8 @@ def _load_payment_config(shop_dir: Path) -> dict:
     # Fall back to the configured default only if it's a raw card.
     raw_card_methods = [m for m in methods if m.get("type", "credit_card") != "stripe"]
     default_id = data.get("default")
-    method = (
-        next((m for m in raw_card_methods if m["id"] == default_id), None)
-        or (raw_card_methods[0] if raw_card_methods else None)
+    method = next((m for m in raw_card_methods if m["id"] == default_id), None) or (
+        raw_card_methods[0] if raw_card_methods else None
     )
 
     if method is None:
@@ -85,7 +87,8 @@ def _load_payment_config(shop_dir: Path) -> dict:
     if not method.get("number"):
         raise AdapterError(
             "payment",
-            "Payment method is missing card number. Use `shop payment add-card` for Shopify checkout.",
+            "Payment method is missing card number."
+            " Use `shop payment add-card` for Shopify checkout.",
         )
 
     return method
@@ -219,7 +222,8 @@ class ShopifyStorefrontAdapter(MerchantAdapter):
     async def get_product(self, sku: str) -> CommerceTXTProduct:
         raise ProductNotFoundError(
             self.slug,
-            "ShopifyStorefrontAdapter does not expose product detail. Use ShopifyCatalogAdapter for search.",
+            "ShopifyStorefrontAdapter does not expose product detail."
+            " Use ShopifyCatalogAdapter for search.",
         )
 
     async def get_capabilities(self) -> dict:
@@ -286,7 +290,9 @@ class ShopifyStorefrontAdapter(MerchantAdapter):
             "shippingAddress": _addr(shipping),
         }
         result = await _gql(
-            self.store_domain, self.storefront_token, _CHECKOUT_CREATE,
+            self.store_domain,
+            self.storefront_token,
+            _CHECKOUT_CREATE,
             {"input": checkout_input},
         )
         errors = result.get("data", {}).get("checkoutCreate", {}).get("checkoutUserErrors", [])
@@ -313,7 +319,9 @@ class ShopifyStorefrontAdapter(MerchantAdapter):
             "vaultId": vault_id,
         }
         complete_result = await _gql(
-            self.store_domain, self.storefront_token, _CHECKOUT_COMPLETE,
+            self.store_domain,
+            self.storefront_token,
+            _CHECKOUT_COMPLETE,
             {"checkoutId": checkout_id, "payment": payment_input},
         )
         complete_data = complete_result.get("data", {}).get("checkoutCompleteWithCreditCardV2", {})

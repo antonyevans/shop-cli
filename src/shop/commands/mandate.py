@@ -7,7 +7,6 @@ import sys
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -43,11 +42,11 @@ def mandate_create(
     budget_total: float = typer.Option(..., "--budget-total"),
     per_order_max: float = typer.Option(..., "--per-order-max"),
     period: str = typer.Option(..., "--period"),
-    category_allow: Optional[str] = typer.Option(None, "--category-allow"),
-    category_deny: Optional[str] = typer.Option(None, "--category-deny"),
-    merchant_allow: Optional[str] = typer.Option(None, "--merchant-allow"),
-    merchant_deny: Optional[str] = typer.Option(None, "--merchant-deny"),
-    expires_at: Optional[str] = typer.Option(None, "--expires-at"),
+    category_allow: str | None = typer.Option(None, "--category-allow"),
+    category_deny: str | None = typer.Option(None, "--category-deny"),
+    merchant_allow: str | None = typer.Option(None, "--merchant-allow"),
+    merchant_deny: str | None = typer.Option(None, "--merchant-deny"),
+    expires_at: str | None = typer.Option(None, "--expires-at"),
     shop_dir: Path = SHOP_DIR,
 ) -> None:
     run_mandate_create_command(
@@ -67,11 +66,11 @@ def run_mandate_create_command(
     budget_total: float,
     per_order_max: float,
     period: str,
-    category_allow: Optional[str],
-    category_deny: Optional[str],
-    merchant_allow: Optional[str],
-    merchant_deny: Optional[str],
-    expires_at: Optional[str],
+    category_allow: str | None,
+    category_deny: str | None,
+    merchant_allow: str | None,
+    merchant_deny: str | None,
+    expires_at: str | None,
     shop_dir: Path = SHOP_DIR,
 ) -> None:
     if period not in ("monthly", "weekly", "one-time"):
@@ -80,7 +79,7 @@ def run_mandate_create_command(
     mandate_id = str(uuid.uuid4())
     now_iso = datetime.now(UTC).isoformat()
 
-    def _split(s: Optional[str]) -> list[str]:
+    def _split(s: str | None) -> list[str]:
         if not s:
             return []
         return [x.strip() for x in s.split(",") if x.strip()]
@@ -115,11 +114,13 @@ def run_mandate_create_command(
     mandates_dir = shop_dir / "mandates"
     file_path = save_mandate(mandate_data, mandates_dir)
 
-    _emit({
-        "mandate_id": mandate_id,
-        "file_path": str(file_path.resolve()),
-        "signature_valid": True,
-    })
+    _emit(
+        {
+            "mandate_id": mandate_id,
+            "file_path": str(file_path.resolve()),
+            "signature_valid": True,
+        }
+    )
 
 
 @app.command("list")
@@ -148,19 +149,21 @@ def run_mandate_list_command(shop_dir: Path = SHOP_DIR) -> None:
         else:
             status = "active"
 
-        result.append({
-            "mandate_id": mandate_id,
-            "status": status,
-            "budget": {
-                "total_usd": total,
-                "spent_usd": round(spent, 2),
-                "remaining_usd": round(remaining, 2),
-                "per_order_max_usd": m.get("budget", {}).get("per_order_max_usd"),
-                "period": period,
-            },
-            "expires_at": m.get("expires_at"),
-            "signature_valid": verify_mandate(m),
-        })
+        result.append(
+            {
+                "mandate_id": mandate_id,
+                "status": status,
+                "budget": {
+                    "total_usd": total,
+                    "spent_usd": round(spent, 2),
+                    "remaining_usd": round(remaining, 2),
+                    "per_order_max_usd": m.get("budget", {}).get("per_order_max_usd"),
+                    "period": period,
+                },
+                "expires_at": m.get("expires_at"),
+                "signature_valid": verify_mandate(m),
+            }
+        )
 
     conn.close()
     _emit({"mandates": result, "total": len(result)})
@@ -184,26 +187,29 @@ def run_mandate_verify_command(mandate_id: str, shop_dir: Path = SHOP_DIR) -> No
     valid = verify_mandate(m)
     expired = is_mandate_expired(m)
 
-    _emit({
-        "mandate_id": mandate_id,
-        "signature_valid": valid,
-        "tamper_detected": not valid,
-        "expires_at": m.get("expires_at"),
-        "expired": expired,
-    })
+    _emit(
+        {
+            "mandate_id": mandate_id,
+            "signature_valid": valid,
+            "tamper_detected": not valid,
+            "expires_at": m.get("expires_at"),
+            "expired": expired,
+        }
+    )
 
 
 @app.command("usage")
 def mandate_usage(
-    mandate_id: Optional[str] = typer.Option(None, "--mandate-id"),
+    mandate_id: str | None = typer.Option(None, "--mandate-id"),
     shop_dir: Path = SHOP_DIR,
 ) -> None:
     run_mandate_usage_command(mandate_id=mandate_id, shop_dir=shop_dir)
 
 
-def run_mandate_usage_command(mandate_id: Optional[str], shop_dir: Path = SHOP_DIR) -> None:
+def run_mandate_usage_command(mandate_id: str | None, shop_dir: Path = SHOP_DIR) -> None:
     if not mandate_id:
         from shop.config import load_config
+
         cfg = load_config(shop_dir / "config.yaml")
         mandate_id = cfg.default_mandate
 
@@ -234,8 +240,7 @@ def run_mandate_usage_command(mandate_id: Optional[str], shop_dir: Path = SHOP_D
         (mandate_id,),
     ).fetchall()
     per_category = [
-        {"category": row["category"], "amount": round(row["total"], 2)}
-        for row in cat_rows
+        {"category": row["category"], "amount": round(row["total"], 2)} for row in cat_rows
     ]
 
     # pending_orders
@@ -260,11 +265,13 @@ def run_mandate_usage_command(mandate_id: Optional[str], shop_dir: Path = SHOP_D
     ]
 
     conn.close()
-    _emit({
-        "mandate_id": mandate_id,
-        "budget_total": total,
-        "budget_used": round(spent, 2),
-        "budget_remaining": round(remaining, 2),
-        "per_category_spend": per_category,
-        "pending_orders": pending_orders,
-    })
+    _emit(
+        {
+            "mandate_id": mandate_id,
+            "budget_total": total,
+            "budget_used": round(spent, 2),
+            "budget_remaining": round(remaining, 2),
+            "per_category_spend": per_category,
+            "pending_orders": pending_orders,
+        }
+    )

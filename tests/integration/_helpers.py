@@ -1,4 +1,5 @@
 """Shared helpers for integration tests — importable by test modules."""
+
 from __future__ import annotations
 
 import json

@@ -10,7 +10,6 @@ import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -21,7 +20,6 @@ from shop.mandate_utils import (
     MandateNotFoundError,
     check_mandate_policy,
     compute_period_start,
-    get_period_spend,
     load_mandate,
 )
 
@@ -40,6 +38,7 @@ def _error(error_code: str, detail: str, exit_code: int) -> None:
 def _store_domain_from_url(checkout_url: str) -> str | None:
     """Extract store domain (e.g. my-store.myshopify.com) from a Shopify checkout URL."""
     from urllib.parse import urlparse
+
     parsed = urlparse(checkout_url)
     return parsed.hostname
 
@@ -66,15 +65,19 @@ async def _place_one_order(
     if merchant.adapter == "shopify_catalog" and checkout_url:
         store_domain = _store_domain_from_url(checkout_url)
         storefront_merchant = next(
-            (m for m in merchants
-             if m.adapter == "shopify_storefront" and m.extra.get("store_domain") == store_domain),
+            (
+                m
+                for m in merchants
+                if m.adapter == "shopify_storefront" and m.extra.get("store_domain") == store_domain
+            ),
             None,
         )
         if not storefront_merchant:
             _error(
                 "store_not_registered",
                 f"Shopify store {store_domain} is not registered for checkout. "
-                f"Run: shop merchant add-shopify-store --store-domain {store_domain} --storefront-token TOKEN",
+                f"Run: shop merchant add-shopify-store"
+                f" --store-domain {store_domain} --storefront-token TOKEN",
                 4,
             )
         merchant = storefront_merchant
@@ -89,7 +92,11 @@ async def _place_one_order(
             product = await adapter.get_product(sku)
             price_usd = product.price * quantity
         except Exception:
-            _error("product_not_found", f"Cannot fetch price for {sku} — add to cart first or use --price-usd", 4)
+            _error(
+                "product_not_found",
+                f"Cannot fetch price for {sku} — add to cart first or use --price-usd",
+                4,
+            )
 
     # Policy checks
     policy_err = check_mandate_policy(mandate, merchant_slug, None, price_usd)
@@ -105,14 +112,16 @@ async def _place_one_order(
         conn.execute("BEGIN IMMEDIATE")
         period = mandate.get("budget", {}).get("period", "monthly")
         period_start = compute_period_start(period)
-        spent = float(conn.execute(
-            """
+        spent = float(
+            conn.execute(
+                """
             SELECT COALESCE(SUM(amount_usd), 0.0) as total
             FROM mandate_spend
             WHERE mandate_id = ? AND recorded_at >= ? AND status IN ('confirmed', 'pending')
             """,
-            (mandate_id, period_start),
-        ).fetchone()["total"])
+                (mandate_id, period_start),
+            ).fetchone()["total"]
+        )
         total_budget = mandate.get("budget", {}).get("total_usd", 0.0)
         if (total_budget - spent) < price_usd:
             conn.execute("ROLLBACK")
@@ -121,7 +130,8 @@ async def _place_one_order(
 
         conn.execute(
             """
-            INSERT INTO mandate_spend (mandate_id, order_id, amount_usd, category, recorded_at, status)
+            INSERT INTO mandate_spend
+            (mandate_id, order_id, amount_usd, category, recorded_at, status)
             VALUES (?, ?, ?, ?, ?, 'pending')
             """,
             (mandate_id, order_id, price_usd, None, now_ts),
@@ -135,7 +145,9 @@ async def _place_one_order(
 
     # Phase 2 — call merchant
     try:
-        result = await adapter.create_order(sku, quantity, mandate_id, idempotency_key, checkout_url=checkout_url)
+        result = await adapter.create_order(
+            sku, quantity, mandate_id, idempotency_key, checkout_url=checkout_url
+        )
     except CheckoutNotSupportedError:
         conn.execute("BEGIN")
         conn.execute("DELETE FROM mandate_spend WHERE order_id = ?", (order_id,))
@@ -179,7 +191,16 @@ async def _place_one_order(
                                 status, exit_code, idempotency_key, raw_response)
             VALUES (?, ?, ?, ?, ?, ?, 'confirmed', 0, ?, ?)
             """,
-            (order_id, now_ts, sku, merchant_slug, price_usd, mandate_id, idempotency_key, raw_resp_json),
+            (
+                order_id,
+                now_ts,
+                sku,
+                merchant_slug,
+                price_usd,
+                mandate_id,
+                idempotency_key,
+                raw_resp_json,
+            ),
         )
     except sqlite3.IntegrityError:
         # Idempotency: read existing order
@@ -203,7 +224,8 @@ async def _place_one_order(
                 "price_usd": existing["price_usd"],
                 "mandate_id": existing["mandate_id"],
                 "idempotency_key": existing["idempotency_key"],
-                "tracking": tracking or {"carrier": None, "tracking_number": None, "estimated_delivery": None},
+                "tracking": tracking
+                or {"carrier": None, "tracking_number": None, "estimated_delivery": None},
             }
         _error("order_failed", "Idempotency conflict but order not found", 6)
     conn.commit()
@@ -227,16 +249,17 @@ async def _place_one_order(
         "price_usd": price_usd,
         "mandate_id": mandate_id,
         "idempotency_key": idempotency_key,
-        "tracking": tracking or {"carrier": None, "tracking_number": None, "estimated_delivery": None},
+        "tracking": tracking
+        or {"carrier": None, "tracking_number": None, "estimated_delivery": None},
     }
 
 
 async def _run_order_create(
-    sku: Optional[str],
+    sku: str | None,
     quantity: int,
     from_cart: bool,
-    session_id: Optional[str],
-    mandate_id: Optional[str],
+    session_id: str | None,
+    mandate_id: str | None,
     idempotency_key: str,
     shop_dir: Path,
     merchants_path: Path,
@@ -295,11 +318,13 @@ async def _run_order_create(
         conn.commit()
         conn.close()
 
-        _emit({
-            "orders": orders,
-            "total_orders": len(orders),
-            "total_amount_usd": round(total_amount, 2),
-        })
+        _emit(
+            {
+                "orders": orders,
+                "total_orders": len(orders),
+                "total_amount_usd": round(total_amount, 2),
+            }
+        )
     else:
         order = await _place_one_order(
             sku=sku,
@@ -309,20 +334,22 @@ async def _run_order_create(
             shop_dir=shop_dir,
             merchants_path=merchants_path,
         )
-        _emit({
-            "orders": [order],
-            "total_orders": 1,
-            "total_amount_usd": round(order["price_usd"], 2),
-        })
+        _emit(
+            {
+                "orders": [order],
+                "total_orders": 1,
+                "total_amount_usd": round(order["price_usd"], 2),
+            }
+        )
 
 
 @app.command("create")
 def order_create(
-    sku: Optional[str] = typer.Option(None, "--sku"),
+    sku: str | None = typer.Option(None, "--sku"),
     quantity: int = typer.Option(1, "--quantity"),
     from_cart: bool = typer.Option(False, "--from-cart"),
-    session_id: Optional[str] = typer.Option(None, "--session-id"),
-    mandate_id: Optional[str] = typer.Option(None, "--mandate-id"),
+    session_id: str | None = typer.Option(None, "--session-id"),
+    mandate_id: str | None = typer.Option(None, "--mandate-id"),
     idempotency_key: str = typer.Option(..., "--idempotency-key"),
     yes: bool = typer.Option(..., "--yes", "-y"),
     shop_dir: Path = SHOP_DIR,
@@ -342,12 +369,12 @@ def order_create(
 
 
 def run_order_create_command(
-    sku: Optional[str] = None,
+    sku: str | None = None,
     quantity: int = 1,
     from_cart: bool = False,
-    session_id: Optional[str] = None,
-    mandate_id: Optional[str] = None,
-    idempotency_key: Optional[str] = None,
+    session_id: str | None = None,
+    mandate_id: str | None = None,
+    idempotency_key: str | None = None,
     yes: bool = False,
     shop_dir: Path = SHOP_DIR,
     merchants_path: Path = MERCHANTS_PATH,
@@ -361,16 +388,18 @@ def run_order_create_command(
     if bool(sku) == bool(from_cart):
         _error("invalid_args", "Exactly one of --sku or --from-cart must be set", 1)
 
-    asyncio.run(_run_order_create(
-        sku=sku,
-        quantity=quantity,
-        from_cart=from_cart,
-        session_id=session_id,
-        mandate_id=mandate_id,
-        idempotency_key=idempotency_key,
-        shop_dir=shop_dir,
-        merchants_path=merchants_path,
-    ))
+    asyncio.run(
+        _run_order_create(
+            sku=sku,
+            quantity=quantity,
+            from_cart=from_cart,
+            session_id=session_id,
+            mandate_id=mandate_id,
+            idempotency_key=idempotency_key,
+            shop_dir=shop_dir,
+            merchants_path=merchants_path,
+        )
+    )
 
 
 @app.command("status")
@@ -383,9 +412,7 @@ def order_status(
 
 def run_order_status_command(order_id: str, shop_dir: Path = SHOP_DIR) -> None:
     conn = get_db(shop_dir)
-    row = conn.execute(
-        "SELECT * FROM orders WHERE order_id = ?", (order_id,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
     conn.close()
 
     if not row:
@@ -400,13 +427,15 @@ def run_order_status_command(order_id: str, shop_dir: Path = SHOP_DIR) -> None:
 
     created_at = datetime.fromtimestamp(row["timestamp"], tz=UTC).isoformat()
 
-    _emit({
-        "order_id": row["order_id"],
-        "status": row["status"],
-        "sku": row["sku"],
-        "merchant": row["merchant"],
-        "price_usd": row["price_usd"],
-        "mandate_id": row["mandate_id"],
-        "created_at": created_at,
-        "tracking": tracking,
-    })
+    _emit(
+        {
+            "order_id": row["order_id"],
+            "status": row["status"],
+            "sku": row["sku"],
+            "merchant": row["merchant"],
+            "price_usd": row["price_usd"],
+            "mandate_id": row["mandate_id"],
+            "created_at": created_at,
+            "tracking": tracking,
+        }
+    )

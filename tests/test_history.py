@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import time
-from pathlib import Path
 
 import pytest
 
@@ -12,7 +11,9 @@ from shop.commands.history import run_history_command
 from shop.db import get_db
 
 
-def _insert_order(conn, order_id, sku, merchant, price, status="confirmed", exit_code=0, mandate_id=None, ts=None):
+def _insert_order(
+    conn, order_id, sku, merchant, price, status="confirmed", exit_code=0, mandate_id=None, ts=None
+):
     ts = ts or int(time.time())
     conn.execute(
         """

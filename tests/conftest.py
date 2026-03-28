@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from pathlib import Path
 
 import pytest
 
@@ -32,8 +31,12 @@ def full_product() -> CommerceTXTProduct:
         availability="InStock",
         stock_count=847,
         shipping=CommerceTXTShipping(cost=0.00, window_days="2-4", carrier="USPS"),
-        returns=CommerceTXTReturns(window_days=30, restocking_fee=None, condition="unopened", refund_timeline_days=5),
-        trust=CommerceTXTTrust(seller_rating=4.7, review_count=312, certifications=[], authenticity="verified"),
+        returns=CommerceTXTReturns(
+            window_days=30, restocking_fee=None, condition="unopened", refund_timeline_days=5
+        ),
+        trust=CommerceTXTTrust(
+            seller_rating=4.7, review_count=312, certifications=[], authenticity="verified"
+        ),
         cached_at=_now(),
     )
 

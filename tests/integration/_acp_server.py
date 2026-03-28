@@ -4,7 +4,10 @@ Two modes:
 - With STRIPE_SECRET_KEY: creates real PaymentIntents (real payment test)
 - Without it: returns stub order (adapter wiring test)
 """
-import os, uuid, json
+
+import json
+import os
+import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 STRIPE_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
@@ -27,15 +30,18 @@ class ACPHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/.well-known/acp":
-            self._respond(200, {
-                "version": "1.0",
-                "name": "ACP Demo Merchant",
-                "acp": {
-                    "endpoint": f"{BASE_URL}/api/acp",
-                    "payment_handlers": ["stripe"],
-                    "currency": "USD",
-                }
-            })
+            self._respond(
+                200,
+                {
+                    "version": "1.0",
+                    "name": "ACP Demo Merchant",
+                    "acp": {
+                        "endpoint": f"{BASE_URL}/api/acp",
+                        "payment_handlers": ["stripe"],
+                        "currency": "USD",
+                    },
+                },
+            )
         else:
             self._respond(404, {"error": "not found"})
 
@@ -67,6 +73,7 @@ class ACPHandler(BaseHTTPRequestHandler):
         if STRIPE_KEY:
             try:
                 import stripe
+
                 stripe.api_key = STRIPE_KEY
                 intent = stripe.PaymentIntent.create(
                     amount=999,
@@ -88,13 +95,16 @@ class ACPHandler(BaseHTTPRequestHandler):
             order_id = f"acp-stub-{uuid.uuid4().hex[:8]}"
             print("  STUB MODE — no real payment")
 
-        self._respond(200, {
-            "order_id": order_id,
-            "status": "confirmed",
-            "total_cents": 999,
-            "currency": "USD",
-            "confirmation_code": f"ACP-{order_id[-8:].upper()}",
-        })
+        self._respond(
+            200,
+            {
+                "order_id": order_id,
+                "status": "confirmed",
+                "total_cents": 999,
+                "currency": "USD",
+                "confirmation_code": f"ACP-{order_id[-8:].upper()}",
+            },
+        )
 
 
 if __name__ == "__main__":

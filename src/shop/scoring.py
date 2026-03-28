@@ -121,8 +121,7 @@ def score(product: CommerceTXTProduct) -> tuple[float, ConfidenceExplanation]:
     explanation = ConfidenceExplanation(
         score=round(total, 4),
         breakdown={
-            k: ConfidenceBreakdown(score=round(signals[k], 4), weight=_WEIGHTS[k])
-            for k in signals
+            k: ConfidenceBreakdown(score=round(signals[k], 4), weight=_WEIGHTS[k]) for k in signals
         },
     )
     return round(total, 4), explanation

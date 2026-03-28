@@ -71,9 +71,8 @@ def _load_shop_pay_credential(shop_dir: Path) -> dict | None:
 
     default_id = data.get("default")
     shop_pay_methods = [m for m in methods if m.get("type") == "shop_pay"]
-    method = (
-        next((m for m in shop_pay_methods if m["id"] == default_id), None)
-        or (shop_pay_methods[0] if shop_pay_methods else None)
+    method = next((m for m in shop_pay_methods if m["id"] == default_id), None) or (
+        shop_pay_methods[0] if shop_pay_methods else None
     )
     if not method:
         return None
@@ -95,6 +94,7 @@ def _extract_variant_id(checkout_url: str) -> str | None:
     Format: https://store.myshopify.com/cart/VARIANT_ID:QTY
     """
     import re
+
     m = re.search(r"/cart/(\d+)(?::|$|\?)", checkout_url)
     if m:
         return f"gid://shopify/ProductVariant/{m.group(1)}"
@@ -123,13 +123,18 @@ class ShopifyUCPAdapter(MerchantAdapter):
             return self._jwt
         try:
             async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-                r = await client.post(_AUTH_URL, json={
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                    "grant_type": "client_credentials",
-                })
+                r = await client.post(
+                    _AUTH_URL,
+                    json={
+                        "client_id": self.client_id,
+                        "client_secret": self.client_secret,
+                        "grant_type": "client_credentials",
+                    },
+                )
                 if r.status_code == 401:
-                    raise AdapterError(self.slug, "Invalid Shopify credentials — check client_id/client_secret")
+                    raise AdapterError(
+                        self.slug, "Invalid Shopify credentials — check client_id/client_secret"
+                    )
                 r.raise_for_status()
                 data = r.json()
         except AdapterError:
@@ -167,7 +172,11 @@ class ShopifyUCPAdapter(MerchantAdapter):
                 result = r.json()
         except httpx.HTTPStatusError as e:
             if e.response.status_code in (401, 403):
-                raise AdapterError(self.slug, f"Shopify UCP auth error: HTTP {e.response.status_code} — check app scopes include checkout")
+                raise AdapterError(
+                    self.slug,
+                    f"Shopify UCP auth error: HTTP {e.response.status_code}"
+                    " — check app scopes include checkout",
+                )
             raise AdapterError(self.slug, f"Shopify UCP HTTP {e.response.status_code}")
         except httpx.TimeoutException:
             raise TimeoutError()
@@ -191,7 +200,8 @@ class ShopifyUCPAdapter(MerchantAdapter):
     async def get_product(self, sku: str) -> CommerceTXTProduct:
         raise ProductNotFoundError(
             self.slug,
-            "ShopifyUCPAdapter does not expose product detail. Use ShopifyCatalogAdapter for search.",
+            "ShopifyUCPAdapter does not expose product detail."
+            " Use ShopifyCatalogAdapter for search.",
         )
 
     async def get_capabilities(self) -> dict:
@@ -249,19 +259,24 @@ class ShopifyUCPAdapter(MerchantAdapter):
         billing = cred.get("billing_address") or {}
 
         # Phase 1: create_checkout
-        create_result = await self._rpc("create_checkout", {
-            "checkout": {
-                "currency": "USD",
-                "line_items": [
-                    {"quantity": quantity, "item": {"product_variant_id": variant_id}}
-                ],
-                "buyer": {"email": buyer_email},
+        create_result = await self._rpc(
+            "create_checkout",
+            {
+                "checkout": {
+                    "currency": "USD",
+                    "line_items": [
+                        {"quantity": quantity, "item": {"product_variant_id": variant_id}}
+                    ],
+                    "buyer": {"email": buyer_email},
+                },
             },
-        })
+        )
 
         checkout_id = create_result.get("id")
         if not checkout_id:
-            raise AdapterError(self.slug, f"No checkout ID in create_checkout response: {create_result}")
+            raise AdapterError(
+                self.slug, f"No checkout ID in create_checkout response: {create_result}"
+            )
 
         status = create_result.get("status", "")
         if status == "requires_escalation":
@@ -273,55 +288,60 @@ class ShopifyUCPAdapter(MerchantAdapter):
 
         # Phase 2: update_checkout — add address + payment instrument
         # update_checkout requires the FULL checkout state (omitted fields are removed)
-        existing_items = create_result.get("line_items", [
-            {"quantity": quantity, "item": {"product_variant_id": variant_id}}
-        ])
+        existing_items = create_result.get(
+            "line_items", [{"quantity": quantity, "item": {"product_variant_id": variant_id}}]
+        )
         update_idempotency = f"{idempotency_key}-update"
 
-        update_result = await self._rpc("update_checkout", {
-            "id": checkout_id,
-            "checkout": {
-                "currency": "USD",
-                "line_items": existing_items,
-                "buyer": {
-                    "email": buyer_email,
-                    **({"billing_address": billing} if billing else {}),
+        update_result = await self._rpc(
+            "update_checkout",
+            {
+                "id": checkout_id,
+                "checkout": {
+                    "currency": "USD",
+                    "line_items": existing_items,
+                    "buyer": {
+                        "email": buyer_email,
+                        **({"billing_address": billing} if billing else {}),
+                    },
+                    "payment": {
+                        "handlers": [{"handler_id": _SHOP_PAY_HANDLER, "type": "SHOP_PAY"}],
+                        "instruments": [
+                            {
+                                "handler_id": _SHOP_PAY_HANDLER,
+                                "type": "SHOP_PAY",
+                                "credential": shop_pay_token,
+                            }
+                        ],
+                    },
                 },
-                "payment": {
-                    "handlers": [
-                        {"handler_id": _SHOP_PAY_HANDLER, "type": "SHOP_PAY"}
-                    ],
-                    "instruments": [
-                        {
-                            "handler_id": _SHOP_PAY_HANDLER,
-                            "type": "SHOP_PAY",
-                            "credential": shop_pay_token,
-                        }
-                    ],
-                },
+                "idempotency-key": update_idempotency,
             },
-            "idempotency-key": update_idempotency,
-        })
+        )
 
         status = update_result.get("status", "")
         if status == "requires_escalation":
             continue_url = update_result.get("continue_url", "")
             raise CheckoutNotSupportedError(
                 self.slug,
-                f"Shopify requires human intervention (payment step): {continue_url or 'no URL provided'}",
+                f"Shopify requires human intervention (payment step): "
+                f"{continue_url or 'no URL provided'}",
             )
 
         # Phase 3: complete_checkout
         complete_idempotency = f"{idempotency_key}-complete"
 
-        complete_result = await self._rpc("complete_checkout", {
-            "id": checkout_id,
-            "payment": {
-                "handler_id": _SHOP_PAY_HANDLER,
-                "credential": shop_pay_token,
+        complete_result = await self._rpc(
+            "complete_checkout",
+            {
+                "id": checkout_id,
+                "payment": {
+                    "handler_id": _SHOP_PAY_HANDLER,
+                    "credential": shop_pay_token,
+                },
+                "idempotency-key": complete_idempotency,
             },
-            "idempotency-key": complete_idempotency,
-        })
+        )
 
         # Poll if still in progress
         status = complete_result.get("status", "")
@@ -337,7 +357,8 @@ class ShopifyUCPAdapter(MerchantAdapter):
             continue_url = complete_result.get("continue_url", "")
             raise CheckoutNotSupportedError(
                 self.slug,
-                f"Shopify requires human intervention (complete step): {continue_url or 'no URL provided'}",
+                f"Shopify requires human intervention (complete step): "
+                f"{continue_url or 'no URL provided'}",
             )
 
         if status != "completed":
@@ -362,4 +383,5 @@ class ShopifyUCPAdapter(MerchantAdapter):
 
 async def _async_sleep(seconds: float) -> None:
     import asyncio
+
     await asyncio.sleep(seconds)

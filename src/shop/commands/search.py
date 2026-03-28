@@ -6,7 +6,6 @@ import asyncio
 import json
 import sys
 import time
-from typing import Optional
 
 import typer
 
@@ -46,7 +45,9 @@ async def _search_one(
         adapter = create_adapter(merchant)
         start = time.monotonic()
         try:
-            products = await asyncio.wait_for(adapter.search(query, filters), timeout=_TIMEOUT_SECONDS)
+            products = await asyncio.wait_for(
+                adapter.search(query, filters), timeout=_TIMEOUT_SECONDS
+            )
             return products, None
         except (TimeoutError, asyncio.TimeoutError):
             duration_ms = int((time.monotonic() - start) * 1000)
@@ -99,8 +100,8 @@ async def _run_search(
 
 def run_search_command(
     query: str,
-    max_price: Optional[float],
-    min_rating: Optional[float],
+    max_price: float | None,
+    min_rating: float | None,
     in_stock_only: bool,
     explain: bool,
     merchants: list[MerchantConfig],
@@ -120,9 +121,7 @@ def run_search_command(
         in_stock_only=in_stock_only,
     )
 
-    response = asyncio.run(
-        _run_search(query, filters, merchants, config, explain)
-    )
+    response = asyncio.run(_run_search(query, filters, merchants, config, explain))
 
     # All merchants failed → exit 6
     if not response.results and len(response.meta.failed_merchants) == len(merchants):
@@ -156,8 +155,10 @@ app = typer.Typer()
 @app.command("products")
 def search_products(
     query: str = typer.Argument(..., help="Search terms"),
-    max_price: Optional[float] = typer.Option(None, "--max-price", help="Maximum price in USD"),
-    min_rating: Optional[float] = typer.Option(None, "--min-rating", help="Minimum seller rating (0-5)"),
+    max_price: float | None = typer.Option(None, "--max-price", help="Maximum price in USD"),
+    min_rating: float | None = typer.Option(
+        None, "--min-rating", help="Minimum seller rating (0-5)"
+    ),
     in_stock_only: bool = typer.Option(False, "--in-stock-only", help="Only return in-stock items"),
     explain: bool = typer.Option(False, "--explain", help="Include confidence score breakdown"),
 ) -> None:

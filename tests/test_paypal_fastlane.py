@@ -42,14 +42,16 @@ def _write_fastlane_payment(
     method_id = "ppfl_test01"
     data = {
         "default": method_id,
-        "methods": [{
-            "id": method_id,
-            "label": "PayPal Fastlane",
-            "type": "paypal_fastlane",
-            "email": email,
-            "fastlane_token": token,
-            "billing_address": {"country": "US"},
-        }],
+        "methods": [
+            {
+                "id": method_id,
+                "label": "PayPal Fastlane",
+                "type": "paypal_fastlane",
+                "email": email,
+                "fastlane_token": token,
+                "billing_address": {"country": "US"},
+            }
+        ],
         "pending": [],
     }
     (tmp_path / "payment.yaml").write_text(yaml.dump(data))
@@ -67,17 +69,22 @@ def _capture_response(order_id: str = "PP-ORDER-001") -> dict:
     return {
         "id": order_id,
         "status": "COMPLETED",
-        "purchase_units": [{
-            "payments": {
-                "captures": [{"id": "CAP-001", "status": "COMPLETED", "amount": {"value": "29.99"}}]
+        "purchase_units": [
+            {
+                "payments": {
+                    "captures": [
+                        {"id": "CAP-001", "status": "COMPLETED", "amount": {"value": "29.99"}}
+                    ]
+                }
             }
-        }],
+        ],
     }
 
 
 # ---------------------------------------------------------------------------
 # Unsupported operations
 # ---------------------------------------------------------------------------
+
 
 class TestUnsupportedOperations:
     @pytest.mark.asyncio
@@ -103,6 +110,7 @@ class TestUnsupportedOperations:
 # Fastlane credential loading
 # ---------------------------------------------------------------------------
 
+
 class TestLoadFastlaneCredential:
     def test_returns_credential_when_present(self, tmp_path):
         _write_fastlane_payment(tmp_path, token="fl_tok_abc")
@@ -117,7 +125,14 @@ class TestLoadFastlaneCredential:
     def test_returns_none_when_stripe_method_only(self, tmp_path):
         data = {
             "default": "pm_1",
-            "methods": [{"id": "pm_1", "type": "stripe", "customer_id": "cus_x", "payment_method_id": "pm_x"}],
+            "methods": [
+                {
+                    "id": "pm_1",
+                    "type": "stripe",
+                    "customer_id": "cus_x",
+                    "payment_method_id": "pm_x",
+                }
+            ],
         }
         (tmp_path / "payment.yaml").write_text(yaml.dump(data))
         assert _load_fastlane_credential(tmp_path) is None
@@ -126,8 +141,18 @@ class TestLoadFastlaneCredential:
         data = {
             "default": "ppfl_second",
             "methods": [
-                {"id": "ppfl_first", "type": "paypal_fastlane", "fastlane_token": "tok_first", "email": "a@b.com"},
-                {"id": "ppfl_second", "type": "paypal_fastlane", "fastlane_token": "tok_second", "email": "c@d.com"},
+                {
+                    "id": "ppfl_first",
+                    "type": "paypal_fastlane",
+                    "fastlane_token": "tok_first",
+                    "email": "a@b.com",
+                },
+                {
+                    "id": "ppfl_second",
+                    "type": "paypal_fastlane",
+                    "fastlane_token": "tok_second",
+                    "email": "c@d.com",
+                },
             ],
         }
         (tmp_path / "payment.yaml").write_text(yaml.dump(data))
@@ -138,6 +163,7 @@ class TestLoadFastlaneCredential:
 # ---------------------------------------------------------------------------
 # OAuth token caching
 # ---------------------------------------------------------------------------
+
 
 class TestAccessTokenCaching:
     @pytest.mark.asyncio
@@ -173,6 +199,7 @@ class TestAccessTokenCaching:
 # Full checkout flow
 # ---------------------------------------------------------------------------
 
+
 class TestCreateOrder:
     @pytest.mark.asyncio
     async def test_successful_two_phase_checkout(self, tmp_path):
@@ -192,8 +219,10 @@ class TestCreateOrder:
                     return_value=httpx.Response(200, json=_capture_response("PP-001"))
                 )
                 result = await adapter.create_order(
-                    sku=f"{_SLUG}:product-x", quantity=2,
-                    mandate_id="m-1", idempotency_key="idem-1",
+                    sku=f"{_SLUG}:product-x",
+                    quantity=2,
+                    mandate_id="m-1",
+                    idempotency_key="idem-1",
                 )
         finally:
             os.environ.pop("SHOP_HOME", None)
@@ -300,6 +329,7 @@ class TestCreateOrder:
 # Error cases
 # ---------------------------------------------------------------------------
 
+
 class TestErrorCases:
     @pytest.mark.asyncio
     async def test_missing_credentials_raises(self, tmp_path):
@@ -334,11 +364,16 @@ class TestErrorCases:
                     return_value=httpx.Response(200, json=_token_response())
                 )
                 respx.post(f"{_SANDBOX_BASE}/v2/checkout/orders").mock(
-                    return_value=httpx.Response(200, json={
-                        "id": "PP-PENDING",
-                        "status": "PAYER_ACTION_REQUIRED",
-                        "links": [{"rel": "payer-action", "href": "https://paypal.com/auth/xxx"}],
-                    })
+                    return_value=httpx.Response(
+                        200,
+                        json={
+                            "id": "PP-PENDING",
+                            "status": "PAYER_ACTION_REQUIRED",
+                            "links": [
+                                {"rel": "payer-action", "href": "https://paypal.com/auth/xxx"}
+                            ],
+                        },
+                    )
                 )
                 with pytest.raises(CheckoutNotSupportedError, match="buyer action"):
                     await adapter.create_order(f"{_SLUG}:item", 1, "m", "k")
@@ -379,11 +414,16 @@ class TestErrorCases:
                     return_value=httpx.Response(200, json=_create_order_response("PP-FAIL"))
                 )
                 respx.post(f"{_SANDBOX_BASE}/v2/checkout/orders/PP-FAIL/capture").mock(
-                    return_value=httpx.Response(200, json={
-                        "id": "PP-FAIL",
-                        "status": "DECLINED",
-                        "purchase_units": [{"payments": {"captures": [{"id": "cap", "status": "DECLINED"}]}}],
-                    })
+                    return_value=httpx.Response(
+                        200,
+                        json={
+                            "id": "PP-FAIL",
+                            "status": "DECLINED",
+                            "purchase_units": [
+                                {"payments": {"captures": [{"id": "cap", "status": "DECLINED"}]}}
+                            ],
+                        },
+                    )
                 )
                 with pytest.raises(AdapterError, match="capture"):
                     await adapter.create_order(f"{_SLUG}:item", 1, "m", "k")

@@ -62,10 +62,14 @@ def mandate_id(shop_home: Path) -> str:
     """Create a test mandate and return its ID."""
     out = shop(
         shop_home,
-        "mandate", "create",
-        "--budget-total", "500",
-        "--per-order-max", "100",
-        "--period", "monthly",
+        "mandate",
+        "create",
+        "--budget-total",
+        "500",
+        "--per-order-max",
+        "100",
+        "--period",
+        "monthly",
     )
     return out["mandate_id"]
 
@@ -135,7 +139,8 @@ def acp_merchant(shop_home: Path, acp_server) -> tuple[Path, str]:
     port, acp_key = acp_server
     slug = "acp-test-local"
 
-    (shop_home / "merchants.yaml").write_text(textwrap.dedent(f"""\
+    (shop_home / "merchants.yaml").write_text(
+        textwrap.dedent(f"""\
         merchants:
         - slug: {slug}
           name: ACP Demo Merchant
@@ -143,16 +148,19 @@ def acp_merchant(shop_home: Path, acp_server) -> tuple[Path, str]:
           base_url: http://localhost:{port}
           acp_endpoint: http://localhost:{port}/api/acp
           acp_key: {acp_key}
-    """))
+    """)
+    )
 
     # Seed a stub Stripe credential. The stub server logs but doesn't validate these.
     # If SHOP_STRIPE_SECRET_KEY is set, copy the real credentials instead.
     real_payment = Path.home() / ".shop" / "payment.yaml"
     if real_payment.exists():
         import shutil
+
         shutil.copy(real_payment, shop_home / "payment.yaml")
     else:
-        (shop_home / "payment.yaml").write_text(textwrap.dedent("""\
+        (shop_home / "payment.yaml").write_text(
+            textwrap.dedent("""\
             default: pm_stub_test
             methods:
             - id: pm_stub_test
@@ -164,7 +172,8 @@ def acp_merchant(shop_home: Path, acp_server) -> tuple[Path, str]:
               card_last4: '4242'
               expiry: 12/2030
             pending: []
-        """))
+        """)
+        )
     (shop_home / "payment.yaml").chmod(0o600)
 
     return shop_home, slug

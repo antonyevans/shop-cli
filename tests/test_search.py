@@ -7,7 +7,7 @@ confidence scoring, error conditions, and CLI wiring.
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
@@ -108,7 +108,9 @@ class TestRunSearchCommand:
             )
         assert exc_info.value.code == 4
 
-    def test_results_sorted_by_confidence_descending(self, mock_merchant, low_threshold_config, capsys):
+    def test_results_sorted_by_confidence_descending(
+        self, mock_merchant, low_threshold_config, capsys
+    ):
         with pytest.raises(SystemExit) as exc_info:
             run_search_command(
                 query="coffee soap notebook",
@@ -206,7 +208,9 @@ class TestRunSearchCommand:
             )
         assert exc_info.value.code == 5
 
-    def test_empty_results_after_filters_exits_0_not_error(self, mock_merchant, low_threshold_config, capsys):
+    def test_empty_results_after_filters_exits_0_not_error(
+        self, mock_merchant, low_threshold_config, capsys
+    ):
         """Empty results from filters is not an error — just an empty list."""
         with pytest.raises(SystemExit) as exc_info:
             run_search_command(

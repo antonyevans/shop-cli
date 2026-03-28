@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import json
 
-import pytest
 from typer.testing import CliRunner
 
 from shop.cli import app
-from shop.commands.schema import _COMMANDS
 
 runner = CliRunner()
 

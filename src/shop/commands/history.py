@@ -6,7 +6,6 @@ import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -23,7 +22,7 @@ def _emit(data: dict, exit_code: int = 0) -> None:
 
 def history_command(
     last: int = typer.Option(20, "--last"),
-    merchant: Optional[str] = typer.Option(None, "--merchant"),
+    merchant: str | None = typer.Option(None, "--merchant"),
     shop_dir: Path = SHOP_DIR,
 ) -> None:
     run_history_command(last=last, merchant=merchant, shop_dir=shop_dir)
@@ -31,7 +30,7 @@ def history_command(
 
 def run_history_command(
     last: int = 20,
-    merchant: Optional[str] = None,
+    merchant: str | None = None,
     shop_dir: Path = SHOP_DIR,
 ) -> None:
     conn = get_db(shop_dir)

@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import os
 import time
-import uuid
 from pathlib import Path
 
 import httpx
@@ -67,9 +66,8 @@ def _load_fastlane_credential(shop_dir: Path) -> dict | None:
 
     default_id = data.get("default")
     fl_methods = [m for m in methods if m.get("type") == "paypal_fastlane"]
-    method = (
-        next((m for m in fl_methods if m["id"] == default_id), None)
-        or (fl_methods[0] if fl_methods else None)
+    method = next((m for m in fl_methods if m["id"] == default_id), None) or (
+        fl_methods[0] if fl_methods else None
     )
     if not method:
         return None
@@ -275,7 +273,9 @@ class PayPalFastlaneAdapter(MerchantAdapter):
         if order_status in ("VOIDED", "PAYER_ACTION_REQUIRED"):
             if order_status == "PAYER_ACTION_REQUIRED":
                 links = order_result.get("links", [])
-                action_url = next((l["href"] for l in links if l.get("rel") == "payer-action"), "")
+                action_url = next(
+                    (link["href"] for link in links if link.get("rel") == "payer-action"), ""
+                )
                 raise CheckoutNotSupportedError(
                     self.slug,
                     f"PayPal requires buyer action: {action_url or 'check PayPal account'}",

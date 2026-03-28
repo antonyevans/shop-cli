@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 import respx
-import httpx
 
-from shop.adapters.shopify_catalog import ShopifyCatalogAdapter, _TOKEN_URL, _SEARCH_URL
 from shop.adapters.base import AdapterError, CheckoutNotSupportedError, ProductNotFoundError
+from shop.adapters.shopify_catalog import _SEARCH_URL, _TOKEN_URL, ShopifyCatalogAdapter
 from shop.models.commerce import SearchFilters
 
 
@@ -21,7 +21,11 @@ def _make_adapter(client_id: str = "cid", client_secret: str = "csec") -> Shopif
 def _token_response() -> httpx.Response:
     return httpx.Response(
         200,
-        json={"access_token": "shpat_test", "scope": "read_global_api_catalog_search", "expires_in": 3600},
+        json={
+            "access_token": "shpat_test",
+            "scope": "read_global_api_catalog_search",
+            "expires_in": 3600,
+        },
     )
 
 
@@ -127,8 +131,16 @@ class TestSearch:
     async def test_max_price_filter_applied(self):
         adapter = _make_adapter()
         products = [
-            {**_SAMPLE_PRODUCT, "upid": "cheap", "variants": [{"price": "5.00", "available": True}]},
-            {**_SAMPLE_PRODUCT, "upid": "expensive", "variants": [{"price": "50.00", "available": True}]},
+            {
+                **_SAMPLE_PRODUCT,
+                "upid": "cheap",
+                "variants": [{"price": "5.00", "available": True}],
+            },
+            {
+                **_SAMPLE_PRODUCT,
+                "upid": "expensive",
+                "variants": [{"price": "50.00", "available": True}],
+            },
         ]
         with respx.mock:
             respx.post(_TOKEN_URL).mock(return_value=_token_response())
@@ -142,7 +154,11 @@ class TestSearch:
     async def test_in_stock_only_filter(self):
         adapter = _make_adapter()
         products = [
-            {**_SAMPLE_PRODUCT, "upid": "instock", "variants": [{"price": "5.00", "available": True}]},
+            {
+                **_SAMPLE_PRODUCT,
+                "upid": "instock",
+                "variants": [{"price": "5.00", "available": True}],
+            },
             {**_SAMPLE_PRODUCT, "upid": "oos", "variants": [{"price": "5.00", "available": False}]},
         ]
         with respx.mock:

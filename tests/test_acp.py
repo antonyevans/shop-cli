@@ -37,19 +37,23 @@ def _confirmed_response(order_id: str = "ord_acp_001") -> dict:
     }
 
 
-def _write_stripe_payment(tmp_path: Path, customer_id: str = "cus_test", pm_id: str = "pm_test") -> None:
+def _write_stripe_payment(
+    tmp_path: Path, customer_id: str = "cus_test", pm_id: str = "pm_test"
+) -> None:
     data = {
         "default": pm_id,
-        "methods": [{
-            "id": pm_id,
-            "label": "My Visa",
-            "type": "stripe",
-            "customer_id": customer_id,
-            "payment_method_id": pm_id,
-            "card_last4": "4242",
-            "card_brand": "visa",
-            "expiry": "12/2026",
-        }],
+        "methods": [
+            {
+                "id": pm_id,
+                "label": "My Visa",
+                "type": "stripe",
+                "customer_id": customer_id,
+                "payment_method_id": pm_id,
+                "card_last4": "4242",
+                "card_brand": "visa",
+                "expiry": "12/2026",
+            }
+        ],
         "pending": [],
     }
     p = tmp_path / "payment.yaml"
@@ -60,6 +64,7 @@ def _write_stripe_payment(tmp_path: Path, customer_id: str = "cus_test", pm_id: 
 # ---------------------------------------------------------------------------
 # Unsupported operations
 # ---------------------------------------------------------------------------
+
 
 class TestUnsupportedOperations:
     @pytest.mark.asyncio
@@ -88,6 +93,7 @@ class TestUnsupportedOperations:
 # Stripe credential loading
 # ---------------------------------------------------------------------------
 
+
 class TestLoadStripeCredential:
     def test_returns_credentials_when_stripe_method_present(self, tmp_path):
         _write_stripe_payment(tmp_path)
@@ -109,8 +115,18 @@ class TestLoadStripeCredential:
         data = {
             "default": "pm_second",
             "methods": [
-                {"id": "pm_first", "type": "stripe", "customer_id": "cus_1", "payment_method_id": "pm_first"},
-                {"id": "pm_second", "type": "stripe", "customer_id": "cus_2", "payment_method_id": "pm_second"},
+                {
+                    "id": "pm_first",
+                    "type": "stripe",
+                    "customer_id": "cus_1",
+                    "payment_method_id": "pm_first",
+                },
+                {
+                    "id": "pm_second",
+                    "type": "stripe",
+                    "customer_id": "cus_2",
+                    "payment_method_id": "pm_second",
+                },
             ],
         }
         (tmp_path / "payment.yaml").write_text(yaml.dump(data))
@@ -121,6 +137,7 @@ class TestLoadStripeCredential:
 # ---------------------------------------------------------------------------
 # Successful checkout
 # ---------------------------------------------------------------------------
+
 
 class TestCreateOrder:
     @pytest.mark.asyncio
@@ -244,6 +261,7 @@ class TestCreateOrder:
 # Error cases
 # ---------------------------------------------------------------------------
 
+
 class TestErrorCases:
     @pytest.mark.asyncio
     async def test_no_acp_endpoint_raises(self, tmp_path):
@@ -307,11 +325,14 @@ class TestErrorCases:
         try:
             with respx.mock:
                 respx.post(f"{_ENDPOINT}/checkout").mock(
-                    return_value=httpx.Response(200, json={
-                        "order_id": "ord_pending",
-                        "status": "requires_action",
-                        "action_url": "https://merchant.example.com/verify",
-                    })
+                    return_value=httpx.Response(
+                        200,
+                        json={
+                            "order_id": "ord_pending",
+                            "status": "requires_action",
+                            "action_url": "https://merchant.example.com/verify",
+                        },
+                    )
                 )
                 with pytest.raises(CheckoutNotSupportedError):
                     await adapter.create_order(f"{_SLUG}:item", 1, "m", "k")
@@ -327,11 +348,14 @@ class TestErrorCases:
         try:
             with respx.mock:
                 respx.post(f"{_ENDPOINT}/checkout").mock(
-                    return_value=httpx.Response(200, json={
-                        "order_id": "ord_dec",
-                        "status": "declined",
-                        "message": "Insufficient funds",
-                    })
+                    return_value=httpx.Response(
+                        200,
+                        json={
+                            "order_id": "ord_dec",
+                            "status": "declined",
+                            "message": "Insufficient funds",
+                        },
+                    )
                 )
                 with pytest.raises(AdapterError, match="declined"):
                     await adapter.create_order(f"{_SLUG}:item", 1, "m", "k")

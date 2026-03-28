@@ -88,7 +88,9 @@ def payment_add(
     label: str = typer.Option(..., "--label", help="Name for this payment method"),
     email: str = typer.Option("", "--email", help="Customer email (optional, for Stripe records)"),
     stripe_key: str = typer.Option(
-        "", "--stripe-key", envvar="STRIPE_SECRET_KEY",
+        "",
+        "--stripe-key",
+        envvar="STRIPE_SECRET_KEY",
         help="Stripe secret key (or set STRIPE_SECRET_KEY env var)",
     ),
     shop_dir: Path = SHOP_DIR,
@@ -123,14 +125,18 @@ def run_payment_add_command(
         customer_id: str = customer["id"]
 
         # Create Stripe Checkout Session (mode=setup)
-        session = _stripe_post(stripe_key, "/checkout/sessions", {
-            "mode": "setup",
-            "customer": customer_id,
-            "payment_method_types[]": "card",
-            # Placeholder URLs — users open this in their browser, not a real redirect target
-            "success_url": "https://shop-cli.dev/payment/success?session_id={CHECKOUT_SESSION_ID}",
-            "cancel_url": "https://shop-cli.dev/payment/cancel",
-        })
+        session = _stripe_post(
+            stripe_key,
+            "/checkout/sessions",
+            {
+                "mode": "setup",
+                "customer": customer_id,
+                "payment_method_types[]": "card",
+                # Placeholder URLs — users open this in their browser, not a real redirect target
+                "success_url": "https://shop-cli.dev/payment/success?session_id={CHECKOUT_SESSION_ID}",
+                "cancel_url": "https://shop-cli.dev/payment/cancel",
+            },
+        )
         session_id: str = session["id"]
         setup_url: str = session["url"]
 
@@ -142,38 +148,49 @@ def run_payment_add_command(
     # Persist pending entry so `payment confirm` can resolve label + customer_id
     data = _load_payment_file(shop_dir)
     data["pending"] = [p for p in data["pending"] if p.get("label") != label]
-    data["pending"].append({
-        "label": label,
-        "session_id": session_id,
-        "customer_id": customer_id,
-        "email": email,
-    })
+    data["pending"].append(
+        {
+            "label": label,
+            "session_id": session_id,
+            "customer_id": customer_id,
+            "email": email,
+        }
+    )
     _save_payment_file(data, shop_dir)
 
-    _emit({
-        "status": "pending",
-        "label": label,
-        "session_id": session_id,
-        "setup_url": setup_url,
-        "expires_in": _SETUP_EXPIRES_IN,
-        "next_step": f"Open the URL in a browser, enter your card, then run: "
-                     f"shop payment confirm --session-id {session_id}",
-    })
+    _emit(
+        {
+            "status": "pending",
+            "label": label,
+            "session_id": session_id,
+            "setup_url": setup_url,
+            "expires_in": _SETUP_EXPIRES_IN,
+            "next_step": f"Open the URL in a browser, enter your card, then run: "
+            f"shop payment confirm --session-id {session_id}",
+        }
+    )
 
 
 @app.command("confirm")
 def payment_confirm(
-    session_id: str = typer.Option(..., "--session-id", help="Stripe checkout session ID from `payment add`"),
+    session_id: str = typer.Option(
+        ..., "--session-id", help="Stripe checkout session ID from `payment add`"
+    ),
     timeout: int = typer.Option(300, "--timeout", help="Max seconds to wait for completion"),
     stripe_key: str = typer.Option(
-        "", "--stripe-key", envvar="STRIPE_SECRET_KEY",
+        "",
+        "--stripe-key",
+        envvar="STRIPE_SECRET_KEY",
         help="Stripe secret key (or set STRIPE_SECRET_KEY env var)",
     ),
     shop_dir: Path = SHOP_DIR,
 ) -> None:
     """Poll Stripe until card setup is complete, then store credentials locally."""
     run_payment_confirm_command(
-        session_id=session_id, timeout=timeout, stripe_key=stripe_key, shop_dir=shop_dir,
+        session_id=session_id,
+        timeout=timeout,
+        stripe_key=stripe_key,
+        shop_dir=shop_dir,
     )
 
 
@@ -191,9 +208,7 @@ def run_payment_confirm_command(
         )
 
     data = _load_payment_file(shop_dir)
-    pending_entry = next(
-        (p for p in data["pending"] if p["session_id"] == session_id), None
-    )
+    pending_entry = next((p for p in data["pending"] if p["session_id"] == session_id), None)
 
     # Poll until session is complete
     deadline = time.monotonic() + timeout
@@ -219,7 +234,8 @@ def run_payment_confirm_command(
     else:
         _error(
             "timeout",
-            f"Card setup not completed within {timeout}s. Run `shop payment confirm` again once done.",
+            f"Card setup not completed within {timeout}s."
+            " Run `shop payment confirm` again once done.",
             6,
         )
 
@@ -263,15 +279,17 @@ def run_payment_confirm_command(
         data["default"] = pm_id
 
     _save_payment_file(data, shop_dir)
-    _emit({
-        "status": "confirmed",
-        "method_id": pm_id,
-        "label": label,
-        "card_last4": card_last4,
-        "card_brand": card_brand,
-        "expiry": expiry,
-        "default": data["default"] == pm_id,
-    })
+    _emit(
+        {
+            "status": "confirmed",
+            "method_id": pm_id,
+            "label": label,
+            "card_last4": card_last4,
+            "card_brand": card_brand,
+            "expiry": expiry,
+            "default": data["default"] == pm_id,
+        }
+    )
 
 
 @app.command("add-shop-pay")
@@ -294,9 +312,16 @@ def payment_add_shop_pay(
     Card details are stored securely by Shop Pay — the agent only uses the token.
     """
     run_payment_add_shop_pay_command(
-        label=label, token=token, email=email,
-        first_name=first_name, last_name=last_name,
-        address1=address1, city=city, province=province, country=country, zip_code=zip_code,
+        label=label,
+        token=token,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        address1=address1,
+        city=city,
+        province=province,
+        country=country,
+        zip_code=zip_code,
         shop_dir=shop_dir,
     )
 
@@ -348,20 +373,24 @@ def run_payment_add_shop_pay_command(
         data["default"] = method_id
 
     _save_payment_file(data, shop_dir)
-    _emit({
-        "status": "added",
-        "method_id": method_id,
-        "label": label,
-        "type": "shop_pay",
-        "email": email,
-        "default": data["default"] == method_id,
-    })
+    _emit(
+        {
+            "status": "added",
+            "method_id": method_id,
+            "label": label,
+            "type": "shop_pay",
+            "email": email,
+            "default": data["default"] == method_id,
+        }
+    )
 
 
 @app.command("add-paypal-fastlane")
 def payment_add_paypal_fastlane(
     label: str = typer.Option("PayPal Fastlane", "--label", help="Name for this payment method"),
-    token: str = typer.Option(..., "--token", help="Fastlane payment token from PayPal authorization"),
+    token: str = typer.Option(
+        ..., "--token", help="Fastlane payment token from PayPal authorization"
+    ),
     email: str = typer.Option("", "--email", help="Buyer email registered with PayPal"),
     name: str = typer.Option("", "--name", help="Buyer full name (for order records)"),
     address1: str = typer.Option("", "--address1"),
@@ -377,8 +406,15 @@ def payment_add_paypal_fastlane(
     authorizes purchases without exposing card details to the agent.
     """
     run_payment_add_paypal_fastlane_command(
-        label=label, token=token, email=email, name=name,
-        address1=address1, city=city, province=province, country=country, zip_code=zip_code,
+        label=label,
+        token=token,
+        email=email,
+        name=name,
+        address1=address1,
+        city=city,
+        province=province,
+        country=country,
+        zip_code=zip_code,
         shop_dir=shop_dir,
     )
 
@@ -427,20 +463,24 @@ def run_payment_add_paypal_fastlane_command(
         data["default"] = method_id
 
     _save_payment_file(data, shop_dir)
-    _emit({
-        "status": "added",
-        "method_id": method_id,
-        "label": label,
-        "type": "paypal_fastlane",
-        "email": email,
-        "default": data["default"] == method_id,
-    })
+    _emit(
+        {
+            "status": "added",
+            "method_id": method_id,
+            "label": label,
+            "type": "paypal_fastlane",
+            "email": email,
+            "default": data["default"] == method_id,
+        }
+    )
 
 
 @app.command("add-bolt")
 def payment_add_bolt(
     label: str = typer.Option("Bolt", "--label", help="Name for this payment method"),
-    token: str = typer.Option(..., "--token", help="Bolt payment token from Bolt account authorization"),
+    token: str = typer.Option(
+        ..., "--token", help="Bolt payment token from Bolt account authorization"
+    ),
     email: str = typer.Option("", "--email", help="Buyer email registered with Bolt"),
     name: str = typer.Option("", "--name", help="Buyer full name"),
     address1: str = typer.Option("", "--address1"),
@@ -456,8 +496,15 @@ def payment_add_bolt(
     Bolt-integrated merchants. The token is obtained by authorizing with Bolt.
     """
     run_payment_add_bolt_command(
-        label=label, token=token, email=email, name=name,
-        address1=address1, city=city, province=province, country=country, zip_code=zip_code,
+        label=label,
+        token=token,
+        email=email,
+        name=name,
+        address1=address1,
+        city=city,
+        province=province,
+        country=country,
+        zip_code=zip_code,
         shop_dir=shop_dir,
     )
 
@@ -506,14 +553,16 @@ def run_payment_add_bolt_command(
         data["default"] = method_id
 
     _save_payment_file(data, shop_dir)
-    _emit({
-        "status": "added",
-        "method_id": method_id,
-        "label": label,
-        "type": "bolt",
-        "email": email,
-        "default": data["default"] == method_id,
-    })
+    _emit(
+        {
+            "status": "added",
+            "method_id": method_id,
+            "label": label,
+            "type": "bolt",
+            "email": email,
+            "default": data["default"] == method_id,
+        }
+    )
 
 
 @app.command("add-card")
@@ -539,9 +588,18 @@ def payment_add_card(
     Production use requires Stripe Setup Intent flow (shop payment add).
     """
     run_payment_add_card_command(
-        label=label, number=number, first_name=first_name, last_name=last_name,
-        month=month, year=year, cvv=cvv,
-        address1=address1, city=city, province=province, country=country, zip_code=zip_code,
+        label=label,
+        number=number,
+        first_name=first_name,
+        last_name=last_name,
+        month=month,
+        year=year,
+        cvv=cvv,
+        address1=address1,
+        city=city,
+        province=province,
+        country=country,
+        zip_code=zip_code,
         shop_dir=shop_dir,
     )
 
@@ -571,7 +629,13 @@ def run_payment_add_card_command(
         _error("invalid_card", "Expiry month must be 1-12", 1)
 
     method_id = f"card_{uuid.uuid4().hex[:8]}"
-    billing = {"address1": address1, "city": city, "province": province, "country": country, "zip": zip_code}
+    billing = {
+        "address1": address1,
+        "city": city,
+        "province": province,
+        "country": country,
+        "zip": zip_code,
+    }
     method = {
         "id": method_id,
         "label": label,
@@ -596,15 +660,17 @@ def run_payment_add_card_command(
         data["default"] = method_id
 
     _save_payment_file(data, shop_dir)
-    _emit({
-        "status": "added",
-        "method_id": method_id,
-        "label": label,
-        "card_last4": clean_number[-4:],
-        "type": "credit_card",
-        "warning": "DEV/TEST ONLY — raw card stored. Use shop payment add for production.",
-        "default": data["default"] == method_id,
-    })
+    _emit(
+        {
+            "status": "added",
+            "method_id": method_id,
+            "label": label,
+            "card_last4": clean_number[-4:],
+            "type": "credit_card",
+            "warning": "DEV/TEST ONLY — raw card stored. Use shop payment add for production.",
+            "default": data["default"] == method_id,
+        }
+    )
 
 
 @app.command("remove")
@@ -642,14 +708,16 @@ def run_payment_list_command(shop_dir: Path = SHOP_DIR) -> None:
     data = _load_payment_file(shop_dir)
     methods = []
     for m in data.get("methods", []):
-        methods.append({
-            "id": m["id"],
-            "label": m.get("label", ""),
-            "type": m.get("type", "stripe"),
-            "card_last4": m.get("card_last4", "????"),
-            "card_brand": m.get("card_brand", ""),
-            "expiry": m.get("expiry", ""),
-            "default": m["id"] == data.get("default"),
-        })
+        methods.append(
+            {
+                "id": m["id"],
+                "label": m.get("label", ""),
+                "type": m.get("type", "stripe"),
+                "card_last4": m.get("card_last4", "????"),
+                "card_brand": m.get("card_brand", ""),
+                "expiry": m.get("expiry", ""),
+                "default": m["id"] == data.get("default"),
+            }
+        )
     pending_count = len(data.get("pending", []))
     _emit({"methods": methods, "count": len(methods), "pending_setups": pending_count})

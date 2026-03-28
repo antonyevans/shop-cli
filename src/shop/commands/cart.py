@@ -8,10 +8,10 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from typing import Optional
 
 import typer
 
+from shop import scoring
 from shop.config import MERCHANTS_PATH, SHOP_DIR, create_adapter, load_config, load_merchants
 from shop.db import get_db
 from shop.mandate_utils import (
@@ -21,7 +21,6 @@ from shop.mandate_utils import (
     get_period_spend,
     load_mandate,
 )
-from shop import scoring
 
 app = typer.Typer()
 
@@ -38,13 +37,13 @@ def _error(error_code: str, detail: str, exit_code: int) -> None:
 async def _cart_add_async(
     sku: str,
     quantity: int,
-    session_id: Optional[str],
+    session_id: str | None,
     dry_run: bool,
-    idempotency_key: Optional[str],
+    idempotency_key: str | None,
     shop_dir: Path,
     merchants_path: Path,
-    price_usd_override: Optional[float] = None,
-    checkout_url: Optional[str] = None,
+    price_usd_override: float | None = None,
+    checkout_url: str | None = None,
 ) -> None:
     from shop.adapters.base import AdapterError, ProductNotFoundError
 
@@ -66,7 +65,9 @@ async def _cart_add_async(
                 4,
             )
 
-    price_usd = (product.price * quantity) if product is not None else (price_usd_override * quantity)
+    price_usd = (
+        (product.price * quantity) if product is not None else (price_usd_override * quantity)
+    )
     if checkout_url is None and product is not None:
         checkout_url = product.checkout_url
 
@@ -98,18 +99,20 @@ async def _cart_add_async(
     confidence = scoring.score(product)[0] if product is not None else 1.0
 
     if dry_run:
-        _emit({
-            "dry_run": True,
-            "sku": sku,
-            "merchant": merchant_slug,
-            "quantity": quantity,
-            "price_usd": price_usd,
-            "mandate_check": mandate_check,
-            "mandate_id": mandate_id,
-            "budget_remaining_after": budget_remaining_after,
-            "confidence": confidence,
-            "warnings": [],
-        })
+        _emit(
+            {
+                "dry_run": True,
+                "sku": sku,
+                "merchant": merchant_slug,
+                "quantity": quantity,
+                "price_usd": price_usd,
+                "mandate_check": mandate_check,
+                "mandate_id": mandate_id,
+                "budget_remaining_after": budget_remaining_after,
+                "confidence": confidence,
+                "warnings": [],
+            }
+        )
 
     ik = idempotency_key or f"{session_id}_sku_{sku}"
     now_ts = int(time.time())
@@ -117,7 +120,8 @@ async def _cart_add_async(
     conn = get_db(shop_dir)
     conn.execute(
         """
-        INSERT OR REPLACE INTO cart_items (session_id, sku, merchant, quantity, price_usd, added_at, checkout_url)
+        INSERT OR REPLACE INTO cart_items
+        (session_id, sku, merchant, quantity, price_usd, added_at, checkout_url)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (session_id, sku, merchant_slug, quantity, price_usd, now_ts, checkout_url),
@@ -133,27 +137,35 @@ async def _cart_add_async(
     ).fetchone()
     conn.close()
 
-    _emit({
-        "session_id": session_id,
-        "sku": sku,
-        "merchant": merchant_slug,
-        "quantity": quantity,
-        "price_usd": price_usd,
-        "cart_total": round(float(totals["cart_total"]), 2),
-        "item_count": totals["item_count"],
-        "idempotency_key": ik,
-    })
+    _emit(
+        {
+            "session_id": session_id,
+            "sku": sku,
+            "merchant": merchant_slug,
+            "quantity": quantity,
+            "price_usd": price_usd,
+            "cart_total": round(float(totals["cart_total"]), 2),
+            "item_count": totals["item_count"],
+            "idempotency_key": ik,
+        }
+    )
 
 
 @app.command("add")
 def cart_add(
     sku: str = typer.Option(..., "--sku"),
     quantity: int = typer.Option(1, "--quantity"),
-    session_id: Optional[str] = typer.Option(None, "--session-id"),
+    session_id: str | None = typer.Option(None, "--session-id"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    idempotency_key: Optional[str] = typer.Option(None, "--idempotency-key"),
-    price_usd: Optional[float] = typer.Option(None, "--price-usd", help="Price override (required for catalog products that don't expose a detail endpoint)"),
-    checkout_url: Optional[str] = typer.Option(None, "--checkout-url", help="Shopify checkout URL from search results"),
+    idempotency_key: str | None = typer.Option(None, "--idempotency-key"),
+    price_usd: float | None = typer.Option(
+        None,
+        "--price-usd",
+        help="Price override (required for catalog products that don't expose a detail endpoint)",
+    ),
+    checkout_url: str | None = typer.Option(
+        None, "--checkout-url", help="Shopify checkout URL from search results"
+    ),
     shop_dir: Path = SHOP_DIR,
     merchants_path: Path = MERCHANTS_PATH,
 ) -> None:
@@ -173,29 +185,38 @@ def cart_add(
 def run_cart_add_command(
     sku: str,
     quantity: int = 1,
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
     dry_run: bool = False,
-    idempotency_key: Optional[str] = None,
-    price_usd_override: Optional[float] = None,
-    checkout_url: Optional[str] = None,
+    idempotency_key: str | None = None,
+    price_usd_override: float | None = None,
+    checkout_url: str | None = None,
     shop_dir: Path = SHOP_DIR,
     merchants_path: Path = MERCHANTS_PATH,
 ) -> None:
-    asyncio.run(_cart_add_async(
-        sku, quantity, session_id, dry_run, idempotency_key,
-        shop_dir, merchants_path, price_usd_override, checkout_url,
-    ))
+    asyncio.run(
+        _cart_add_async(
+            sku,
+            quantity,
+            session_id,
+            dry_run,
+            idempotency_key,
+            shop_dir,
+            merchants_path,
+            price_usd_override,
+            checkout_url,
+        )
+    )
 
 
 @app.command("view")
 def cart_view(
-    session_id: Optional[str] = typer.Option(None, "--session-id"),
+    session_id: str | None = typer.Option(None, "--session-id"),
     shop_dir: Path = SHOP_DIR,
 ) -> None:
     run_cart_view_command(session_id=session_id, shop_dir=shop_dir)
 
 
-def run_cart_view_command(session_id: Optional[str] = None, shop_dir: Path = SHOP_DIR) -> None:
+def run_cart_view_command(session_id: str | None = None, shop_dir: Path = SHOP_DIR) -> None:
     conn = get_db(shop_dir)
 
     if not session_id:
@@ -204,11 +225,20 @@ def run_cart_view_command(session_id: Optional[str] = None, shop_dir: Path = SHO
         ).fetchone()
         if not row:
             conn.close()
-            _emit({"session_id": None, "items": [], "cart_total": 0.0, "item_count": 0, "created_at": None})
+            _emit(
+                {
+                    "session_id": None,
+                    "items": [],
+                    "cart_total": 0.0,
+                    "item_count": 0,
+                    "created_at": None,
+                }
+            )
         session_id = row["session_id"]
 
     items_rows = conn.execute(
-        "SELECT sku, merchant, quantity, price_usd, checkout_url FROM cart_items WHERE session_id = ?",
+        "SELECT sku, merchant, quantity, price_usd, checkout_url"
+        " FROM cart_items WHERE session_id = ?",
         (session_id,),
     ).fetchall()
 
@@ -220,10 +250,13 @@ def run_cart_view_command(session_id: Optional[str] = None, shop_dir: Path = SHO
     conn.close()
 
     from datetime import UTC, datetime
+
     items = [
         {
-            "sku": r["sku"], "merchant": r["merchant"],
-            "quantity": r["quantity"], "price_usd": r["price_usd"],
+            "sku": r["sku"],
+            "merchant": r["merchant"],
+            "quantity": r["quantity"],
+            "price_usd": r["price_usd"],
             "checkout_url": r["checkout_url"],
         }
         for r in items_rows
@@ -233,18 +266,20 @@ def run_cart_view_command(session_id: Optional[str] = None, shop_dir: Path = SHO
     if earliest and earliest["min_added"]:
         created_at = datetime.fromtimestamp(earliest["min_added"], tz=UTC).isoformat()
 
-    _emit({
-        "session_id": session_id,
-        "items": items,
-        "cart_total": round(cart_total, 2),
-        "item_count": len(items),
-        "created_at": created_at,
-    })
+    _emit(
+        {
+            "session_id": session_id,
+            "items": items,
+            "cart_total": round(cart_total, 2),
+            "item_count": len(items),
+            "created_at": created_at,
+        }
+    )
 
 
 @app.command("clear")
 def cart_clear(
-    session_id: Optional[str] = typer.Option(None, "--session-id"),
+    session_id: str | None = typer.Option(None, "--session-id"),
     yes: bool = typer.Option(..., "--yes", "-y"),
     shop_dir: Path = SHOP_DIR,
 ) -> None:
@@ -252,7 +287,7 @@ def cart_clear(
 
 
 def run_cart_clear_command(
-    session_id: Optional[str] = None,
+    session_id: str | None = None,
     yes: bool = False,
     shop_dir: Path = SHOP_DIR,
 ) -> None:

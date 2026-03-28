@@ -16,7 +16,12 @@ from datetime import UTC, datetime
 
 import httpx
 
-from shop.adapters.base import AdapterError, CheckoutNotSupportedError, MerchantAdapter, ProductNotFoundError
+from shop.adapters.base import (
+    AdapterError,
+    CheckoutNotSupportedError,
+    MerchantAdapter,
+    ProductNotFoundError,
+)
 from shop.models.commerce import (
     CommerceTXTProduct,
     CommerceTXTReturns,
@@ -110,8 +115,12 @@ class ShopifyCatalogAdapter(MerchantAdapter):
             if e.response.status_code == 401:
                 # Token may have been revoked — clear cache and signal error
                 self._token = None
-                raise AdapterError(self.slug, "Shopify auth token rejected; re-run shop merchant connect shopify")
-            raise AdapterError(self.slug, f"Shopify Catalog search failed: HTTP {e.response.status_code}")
+                raise AdapterError(
+                    self.slug, "Shopify auth token rejected; re-run shop merchant connect shopify"
+                )
+            raise AdapterError(
+                self.slug, f"Shopify Catalog search failed: HTTP {e.response.status_code}"
+            )
         except httpx.TimeoutException:
             raise TimeoutError()
         except Exception as e:
@@ -147,13 +156,18 @@ class ShopifyCatalogAdapter(MerchantAdapter):
         }
 
     async def create_order(
-        self, sku: str, quantity: int, mandate_id: str, idempotency_key: str,
+        self,
+        sku: str,
+        quantity: int,
+        mandate_id: str,
+        idempotency_key: str,
         checkout_url: str | None = None,
     ) -> dict:
         raise CheckoutNotSupportedError(
             self.slug,
             "ShopifyCatalogAdapter supports search only. "
-            "Checkout flows through the merchant's native Shopify checkout (checkoutUrl in search results). "
+            "Checkout flows through the merchant's native Shopify checkout "
+            "(checkoutUrl in search results). "
             "Full Shopify checkout support is planned for v1.",
         )
 

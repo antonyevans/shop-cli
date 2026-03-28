@@ -94,6 +94,7 @@ class TestCachedAt:
     @pytest.mark.asyncio
     async def test_cached_at_is_iso8601(self, adapter):
         from datetime import datetime
+
         results = await adapter.search("coffee", SearchFilters())
         # Should parse without error
         datetime.fromisoformat(results[0].cached_at)

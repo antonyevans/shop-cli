@@ -17,10 +17,30 @@ _COMMANDS = [
         "description": "Search for products across registered merchants",
         "flags": [
             {"name": "query", "type": "string", "required": True, "description": "Search terms"},
-            {"name": "max-price", "type": "float", "required": False, "description": "Maximum price in USD"},
-            {"name": "min-rating", "type": "float", "required": False, "description": "Minimum seller rating (0-5)"},
-            {"name": "in-stock-only", "type": "bool", "required": False, "description": "Filter to in-stock only"},
-            {"name": "explain", "type": "bool", "required": False, "description": "Include confidence breakdown"},
+            {
+                "name": "max-price",
+                "type": "float",
+                "required": False,
+                "description": "Maximum price in USD",
+            },
+            {
+                "name": "min-rating",
+                "type": "float",
+                "required": False,
+                "description": "Minimum seller rating (0-5)",
+            },
+            {
+                "name": "in-stock-only",
+                "type": "bool",
+                "required": False,
+                "description": "Filter to in-stock only",
+            },
+            {
+                "name": "explain",
+                "type": "bool",
+                "required": False,
+                "description": "Include confidence breakdown",
+            },
         ],
         "exit_codes": [0, 4, 5, 6],
         "mutates": False,
@@ -38,13 +58,35 @@ _COMMANDS = [
     {
         "noun": "cart",
         "verb": "add",
-        "description": "Add a product to cart. Use --dry-run to validate mandate compliance without committing.",
+        "description": "Add a product to cart. Use --dry-run to validate mandate compliance"
+        " without committing.",
         "flags": [
             {"name": "sku", "type": "string", "required": True, "description": "Product SKU"},
-            {"name": "quantity", "type": "int", "required": False, "default": 1, "description": "Quantity"},
-            {"name": "session-id", "type": "string", "required": False, "description": "Cart session ID for multi-step workflows"},
-            {"name": "dry-run", "type": "bool", "required": False, "description": "Validate without committing"},
-            {"name": "idempotency-key", "type": "string", "required": False, "description": "Idempotency key"},
+            {
+                "name": "quantity",
+                "type": "int",
+                "required": False,
+                "default": 1,
+                "description": "Quantity",
+            },
+            {
+                "name": "session-id",
+                "type": "string",
+                "required": False,
+                "description": "Cart session ID for multi-step workflows",
+            },
+            {
+                "name": "dry-run",
+                "type": "bool",
+                "required": False,
+                "description": "Validate without committing",
+            },
+            {
+                "name": "idempotency-key",
+                "type": "string",
+                "required": False,
+                "description": "Idempotency key",
+            },
         ],
         "exit_codes": [0, 3, 4, 5],
         "mutates": True,
@@ -54,7 +96,12 @@ _COMMANDS = [
         "verb": "view",
         "description": "View current cart contents",
         "flags": [
-            {"name": "session-id", "type": "string", "required": False, "description": "Cart session ID"},
+            {
+                "name": "session-id",
+                "type": "string",
+                "required": False,
+                "description": "Cart session ID",
+            },
         ],
         "exit_codes": [0],
         "mutates": False,
@@ -64,7 +111,12 @@ _COMMANDS = [
         "verb": "clear",
         "description": "Clear all items from cart",
         "flags": [
-            {"name": "session-id", "type": "string", "required": False, "description": "Cart session ID"},
+            {
+                "name": "session-id",
+                "type": "string",
+                "required": False,
+                "description": "Cart session ID",
+            },
             {"name": "yes", "type": "bool", "required": True, "description": "Confirm clear"},
         ],
         "exit_codes": [0],
@@ -75,12 +127,43 @@ _COMMANDS = [
         "verb": "create",
         "description": "Execute purchase from cart or direct SKU. Requires a mandate.",
         "flags": [
-            {"name": "from-cart", "type": "bool", "required": False, "description": "Use items from current cart session"},
-            {"name": "session-id", "type": "string", "required": False, "description": "Cart session ID (required with --from-cart)"},
-            {"name": "sku", "type": "string", "required": False, "description": "Direct SKU purchase (alternative to --from-cart)"},
-            {"name": "quantity", "type": "int", "required": False, "default": 1, "description": "Quantity for direct SKU purchase"},
-            {"name": "mandate-id", "type": "string", "required": False, "description": "Mandate ID (defaults to config default_mandate)"},
-            {"name": "idempotency-key", "type": "string", "required": True, "description": "Required for safe retry"},
+            {
+                "name": "from-cart",
+                "type": "bool",
+                "required": False,
+                "description": "Use items from current cart session",
+            },
+            {
+                "name": "session-id",
+                "type": "string",
+                "required": False,
+                "description": "Cart session ID (required with --from-cart)",
+            },
+            {
+                "name": "sku",
+                "type": "string",
+                "required": False,
+                "description": "Direct SKU purchase (alternative to --from-cart)",
+            },
+            {
+                "name": "quantity",
+                "type": "int",
+                "required": False,
+                "default": 1,
+                "description": "Quantity for direct SKU purchase",
+            },
+            {
+                "name": "mandate-id",
+                "type": "string",
+                "required": False,
+                "description": "Mandate ID (defaults to config default_mandate)",
+            },
+            {
+                "name": "idempotency-key",
+                "type": "string",
+                "required": True,
+                "description": "Required for safe retry",
+            },
             {"name": "yes", "type": "bool", "required": True, "description": "Confirm purchase"},
         ],
         "exit_codes": [0, 2, 3, 4, 5, 6],
@@ -101,14 +184,54 @@ _COMMANDS = [
         "verb": "create",
         "description": "Create a new Ed25519-signed spending mandate",
         "flags": [
-            {"name": "budget-total", "type": "float", "required": True, "description": "Total budget in USD"},
-            {"name": "per-order-max", "type": "float", "required": True, "description": "Per-order maximum in USD"},
-            {"name": "period", "type": "string", "required": True, "description": "monthly | weekly | one-time"},
-            {"name": "category-allow", "type": "string", "required": False, "description": "Comma-separated allowed categories"},
-            {"name": "category-deny", "type": "string", "required": False, "description": "Comma-separated denied categories"},
-            {"name": "merchant-allow", "type": "string", "required": False, "description": "Comma-separated allowed merchant slugs"},
-            {"name": "merchant-deny", "type": "string", "required": False, "description": "Comma-separated denied merchant slugs"},
-            {"name": "expires-at", "type": "string", "required": False, "description": "ISO8601 expiry timestamp"},
+            {
+                "name": "budget-total",
+                "type": "float",
+                "required": True,
+                "description": "Total budget in USD",
+            },
+            {
+                "name": "per-order-max",
+                "type": "float",
+                "required": True,
+                "description": "Per-order maximum in USD",
+            },
+            {
+                "name": "period",
+                "type": "string",
+                "required": True,
+                "description": "monthly | weekly | one-time",
+            },
+            {
+                "name": "category-allow",
+                "type": "string",
+                "required": False,
+                "description": "Comma-separated allowed categories",
+            },
+            {
+                "name": "category-deny",
+                "type": "string",
+                "required": False,
+                "description": "Comma-separated denied categories",
+            },
+            {
+                "name": "merchant-allow",
+                "type": "string",
+                "required": False,
+                "description": "Comma-separated allowed merchant slugs",
+            },
+            {
+                "name": "merchant-deny",
+                "type": "string",
+                "required": False,
+                "description": "Comma-separated denied merchant slugs",
+            },
+            {
+                "name": "expires-at",
+                "type": "string",
+                "required": False,
+                "description": "ISO8601 expiry timestamp",
+            },
         ],
         "exit_codes": [0, 1],
         "mutates": True,
@@ -126,7 +249,12 @@ _COMMANDS = [
         "verb": "verify",
         "description": "Verify Ed25519 signature and tamper detection for a mandate",
         "flags": [
-            {"name": "mandate-id", "type": "string", "required": True, "description": "Mandate ID to verify"},
+            {
+                "name": "mandate-id",
+                "type": "string",
+                "required": True,
+                "description": "Mandate ID to verify",
+            },
         ],
         "exit_codes": [0, 1],
         "mutates": False,
@@ -136,7 +264,12 @@ _COMMANDS = [
         "verb": "usage",
         "description": "Get budget utilization and pending orders for a mandate",
         "flags": [
-            {"name": "mandate-id", "type": "string", "required": False, "description": "Defaults to config default_mandate"},
+            {
+                "name": "mandate-id",
+                "type": "string",
+                "required": False,
+                "description": "Defaults to config default_mandate",
+            },
         ],
         "exit_codes": [0, 1],
         "mutates": False,
@@ -144,9 +277,15 @@ _COMMANDS = [
     {
         "noun": "merchant",
         "verb": "add",
-        "description": "Register a UCP-compatible merchant by HTTPS URL (discovers via /.well-known/ucp)",
+        "description": "Register a UCP-compatible merchant by HTTPS URL"
+        " (discovers via /.well-known/ucp)",
         "flags": [
-            {"name": "url", "type": "string", "required": True, "description": "Merchant HTTPS URL"},
+            {
+                "name": "url",
+                "type": "string",
+                "required": True,
+                "description": "Merchant HTTPS URL",
+            },
         ],
         "exit_codes": [0, 1, 4],
         "mutates": True,
@@ -154,11 +293,28 @@ _COMMANDS = [
     {
         "noun": "merchant",
         "verb": "connect-shopify",
-        "description": "Connect Shopify Global Catalog — one credential searches all Shopify merchants",
+        "description": "Connect Shopify Global Catalog"
+        " — one credential searches all Shopify merchants",
         "flags": [
-            {"name": "client-id", "type": "string", "required": True, "description": "Shopify Dev Dashboard app client ID"},
-            {"name": "client-secret", "type": "string", "required": True, "description": "Shopify Dev Dashboard app client secret"},
-            {"name": "ships-to", "type": "string", "required": False, "default": "US", "description": "ISO 3166-1 alpha-2 country code"},
+            {
+                "name": "client-id",
+                "type": "string",
+                "required": True,
+                "description": "Shopify Dev Dashboard app client ID",
+            },
+            {
+                "name": "client-secret",
+                "type": "string",
+                "required": True,
+                "description": "Shopify Dev Dashboard app client secret",
+            },
+            {
+                "name": "ships-to",
+                "type": "string",
+                "required": False,
+                "default": "US",
+                "description": "ISO 3166-1 alpha-2 country code",
+            },
         ],
         "exit_codes": [0, 2, 6],
         "mutates": True,
@@ -166,11 +322,27 @@ _COMMANDS = [
     {
         "noun": "payment",
         "verb": "add",
-        "description": "Start Stripe card setup — returns a browser URL. Card details entered in Stripe, never by the agent.",
+        "description": "Start Stripe card setup — returns a browser URL."
+        " Card details entered in Stripe, never by the agent.",
         "flags": [
-            {"name": "label", "type": "string", "required": True, "description": "Name for this payment method"},
-            {"name": "email", "type": "string", "required": False, "description": "Customer email for Stripe records"},
-            {"name": "stripe-key", "type": "string", "required": False, "description": "Stripe secret key (or STRIPE_SECRET_KEY env var)"},
+            {
+                "name": "label",
+                "type": "string",
+                "required": True,
+                "description": "Name for this payment method",
+            },
+            {
+                "name": "email",
+                "type": "string",
+                "required": False,
+                "description": "Customer email for Stripe records",
+            },
+            {
+                "name": "stripe-key",
+                "type": "string",
+                "required": False,
+                "description": "Stripe secret key (or STRIPE_SECRET_KEY env var)",
+            },
         ],
         "exit_codes": [0, 1, 2, 6],
         "mutates": True,
@@ -178,11 +350,28 @@ _COMMANDS = [
     {
         "noun": "payment",
         "verb": "confirm",
-        "description": "Poll Stripe until card setup completes, then store credentials locally (chmod 600).",
+        "description": "Poll Stripe until card setup completes,"
+        " then store credentials locally (chmod 600).",
         "flags": [
-            {"name": "session-id", "type": "string", "required": True, "description": "Stripe checkout session ID from `payment add`"},
-            {"name": "timeout", "type": "int", "required": False, "default": 300, "description": "Max seconds to wait"},
-            {"name": "stripe-key", "type": "string", "required": False, "description": "Stripe secret key (or STRIPE_SECRET_KEY env var)"},
+            {
+                "name": "session-id",
+                "type": "string",
+                "required": True,
+                "description": "Stripe checkout session ID from `payment add`",
+            },
+            {
+                "name": "timeout",
+                "type": "int",
+                "required": False,
+                "default": 300,
+                "description": "Max seconds to wait",
+            },
+            {
+                "name": "stripe-key",
+                "type": "string",
+                "required": False,
+                "description": "Stripe secret key (or STRIPE_SECRET_KEY env var)",
+            },
         ],
         "exit_codes": [0, 1, 2, 6],
         "mutates": True,
@@ -190,7 +379,8 @@ _COMMANDS = [
     {
         "noun": "payment",
         "verb": "list",
-        "description": "List stored payment methods (no sensitive data — only last4, brand, expiry).",
+        "description": "List stored payment methods"
+        " (no sensitive data — only last4, brand, expiry).",
         "flags": [],
         "exit_codes": [0],
         "mutates": False,
@@ -200,7 +390,12 @@ _COMMANDS = [
         "verb": "remove",
         "description": "Remove a stored payment method by ID.",
         "flags": [
-            {"name": "id", "type": "string", "required": True, "description": "Payment method ID to remove"},
+            {
+                "name": "id",
+                "type": "string",
+                "required": True,
+                "description": "Payment method ID to remove",
+            },
         ],
         "exit_codes": [0, 1],
         "mutates": True,
@@ -208,10 +403,22 @@ _COMMANDS = [
     {
         "noun": "history",
         "verb": None,
-        "description": "View transaction history from local SQLite audit log. Note: no verb — this command is `shop history [flags]`.",
+        "description": "View transaction history from local SQLite audit log."
+        " Note: no verb — this command is `shop history [flags]`.",
         "flags": [
-            {"name": "last", "type": "int", "required": False, "default": 20, "description": "Number of most recent records"},
-            {"name": "merchant", "type": "string", "required": False, "description": "Filter by merchant slug"},
+            {
+                "name": "last",
+                "type": "int",
+                "required": False,
+                "default": 20,
+                "description": "Number of most recent records",
+            },
+            {
+                "name": "merchant",
+                "type": "string",
+                "required": False,
+                "description": "Filter by merchant slug",
+            },
         ],
         "exit_codes": [0],
         "mutates": False,
@@ -219,7 +426,8 @@ _COMMANDS = [
     {
         "noun": "schema",
         "verb": "commands",
-        "description": "List all available commands with flags, types, and exit codes. This output is this schema.",
+        "description": "List all available commands with flags, types, and exit codes."
+        " This output is this schema.",
         "flags": [],
         "exit_codes": [0],
         "mutates": False,

@@ -11,14 +11,11 @@ import yaml
 from shop.commands.mandate import (
     run_mandate_create_command,
     run_mandate_list_command,
-    run_mandate_verify_command,
     run_mandate_usage_command,
+    run_mandate_verify_command,
 )
 from shop.mandate_utils import (
-    get_or_create_device_key,
     load_mandate,
-    save_mandate,
-    sign_mandate,
     verify_mandate,
 )
 

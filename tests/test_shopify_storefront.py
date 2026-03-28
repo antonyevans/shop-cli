@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 import respx
-import httpx
 
+from shop.adapters.base import AdapterError, ProductNotFoundError
 from shop.adapters.shopify_storefront import (
+    _VAULT_URL,
     ShopifyStorefrontAdapter,
     _extract_variant_id,
-    _VAULT_URL,
 )
-from shop.adapters.base import AdapterError, CheckoutNotSupportedError, ProductNotFoundError
 from shop.models.commerce import SearchFilters
-
 
 _STORE = "my-store.myshopify.com"
 _TOKEN = "test_storefront_token"
@@ -30,7 +29,13 @@ _CARD = {
     "year": 2026,
     "cvv": "123",
     "email": "agent@shop-cli.dev",
-    "billing": {"address1": "1 Main St", "city": "NYC", "province": "NY", "country": "US", "zip": "10001"},
+    "billing": {
+        "address1": "1 Main St",
+        "city": "NYC",
+        "province": "NY",
+        "country": "US",
+        "zip": "10001",
+    },
 }
 
 _CHECKOUT_URL = f"https://{_STORE}/cart/1234567890:1"
@@ -115,16 +120,20 @@ class TestCreateOrder:
 
         # Write payment config
         import yaml
+
         payment_path = tmp_path / "payment.yaml"
         payment_path.write_text(yaml.dump({"default": "card_abc", "methods": [_CARD]}))
         payment_path.chmod(0o600)
 
         import os
+
         os.environ["SHOP_HOME"] = str(tmp_path)
 
         try:
             with respx.mock:
-                respx.post(_VAULT_URL).mock(return_value=httpx.Response(200, json={"id": "vault_tok_123"}))
+                respx.post(_VAULT_URL).mock(
+                    return_value=httpx.Response(200, json={"id": "vault_tok_123"})
+                )
                 respx.post(_GQL_URL).mock(
                     side_effect=[
                         httpx.Response(200, json=_gql_checkout_create_ok()),
@@ -150,7 +159,10 @@ class TestCreateOrder:
     async def test_missing_checkout_url_raises(self, tmp_path):
         adapter = _make_adapter()
 
-        import yaml, os
+        import os
+
+        import yaml
+
         payment_path = tmp_path / "payment.yaml"
         payment_path.write_text(yaml.dump({"default": "card_abc", "methods": [_CARD]}))
         os.environ["SHOP_HOME"] = str(tmp_path)
@@ -166,10 +178,13 @@ class TestCreateOrder:
         adapter = _make_adapter()
 
         import os
+
         os.environ["SHOP_HOME"] = str(tmp_path)
         try:
             with pytest.raises(AdapterError, match="payment"):
-                await adapter.create_order("shopify:123", 1, "m-123", "idem", checkout_url=_CHECKOUT_URL)
+                await adapter.create_order(
+                    "shopify:123", 1, "m-123", "idem", checkout_url=_CHECKOUT_URL
+                )
         finally:
             os.environ.pop("SHOP_HOME", None)
 
@@ -177,7 +192,10 @@ class TestCreateOrder:
     async def test_checkout_user_errors_raises(self, tmp_path):
         adapter = _make_adapter()
 
-        import yaml, os
+        import os
+
+        import yaml
+
         payment_path = tmp_path / "payment.yaml"
         payment_path.write_text(yaml.dump({"default": "card_abc", "methods": [_CARD]}))
         os.environ["SHOP_HOME"] = str(tmp_path)
@@ -186,7 +204,9 @@ class TestCreateOrder:
             "data": {
                 "checkoutCreate": {
                     "checkout": None,
-                    "checkoutUserErrors": [{"code": "INVALID", "field": "variantId", "message": "Variant not found"}],
+                    "checkoutUserErrors": [
+                        {"code": "INVALID", "field": "variantId", "message": "Variant not found"}
+                    ],
                 }
             }
         }
@@ -195,7 +215,9 @@ class TestCreateOrder:
             with respx.mock:
                 respx.post(_GQL_URL).mock(return_value=httpx.Response(200, json=error_response))
                 with pytest.raises(AdapterError, match="Variant not found"):
-                    await adapter.create_order("shopify:1234567890", 1, "m-123", "idem", checkout_url=_CHECKOUT_URL)
+                    await adapter.create_order(
+                        "shopify:1234567890", 1, "m-123", "idem", checkout_url=_CHECKOUT_URL
+                    )
         finally:
             os.environ.pop("SHOP_HOME", None)
 
@@ -203,7 +225,10 @@ class TestCreateOrder:
     async def test_payment_declined_raises(self, tmp_path):
         adapter = _make_adapter()
 
-        import yaml, os
+        import os
+
+        import yaml
+
         payment_path = tmp_path / "payment.yaml"
         payment_path.write_text(yaml.dump({"default": "card_abc", "methods": [_CARD]}))
         os.environ["SHOP_HOME"] = str(tmp_path)
@@ -211,7 +236,11 @@ class TestCreateOrder:
         declined_response = {
             "data": {
                 "checkoutCompleteWithCreditCardV2": {
-                    "checkout": {"id": "gid://shopify/Checkout/abc", "completedAt": None, "order": None},
+                    "checkout": {
+                        "id": "gid://shopify/Checkout/abc",
+                        "completedAt": None,
+                        "order": None,
+                    },
                     "payment": {"id": "pay_1", "ready": False, "errorMessage": "Card declined"},
                     "checkoutUserErrors": [],
                 }
@@ -220,7 +249,9 @@ class TestCreateOrder:
 
         try:
             with respx.mock:
-                respx.post(_VAULT_URL).mock(return_value=httpx.Response(200, json={"id": "vault_tok"}))
+                respx.post(_VAULT_URL).mock(
+                    return_value=httpx.Response(200, json={"id": "vault_tok"})
+                )
                 respx.post(_GQL_URL).mock(
                     side_effect=[
                         httpx.Response(200, json=_gql_checkout_create_ok()),
@@ -228,6 +259,8 @@ class TestCreateOrder:
                     ]
                 )
                 with pytest.raises(AdapterError, match="declined"):
-                    await adapter.create_order("shopify:1234567890", 1, "m-123", "idem", checkout_url=_CHECKOUT_URL)
+                    await adapter.create_order(
+                        "shopify:1234567890", 1, "m-123", "idem", checkout_url=_CHECKOUT_URL
+                    )
         finally:
             os.environ.pop("SHOP_HOME", None)

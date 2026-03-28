@@ -63,10 +63,7 @@ def _load_stripe_payment(shop_dir: Path) -> dict | None:
         return None
 
     default_id = data.get("default")
-    method = (
-        next((m for m in methods if m["id"] == default_id), None)
-        or methods[0]
-    )
+    method = next((m for m in methods if m["id"] == default_id), None) or methods[0]
     if method.get("type") != "stripe":
         return None
 
@@ -89,7 +86,13 @@ def _load_or_create_signing_key() -> ec.EllipticCurvePrivateKey:
 
     key = ec.generate_private_key(ec.SECP256R1())
     with key_path.open("wb") as f:
-        f.write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+        f.write(
+            key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
+        )
     key_path.chmod(0o600)
     return key
 
@@ -102,9 +105,13 @@ def _make_request_signature(body: bytes) -> str:
     """
     key = _load_or_create_signing_key()
 
-    header = base64.urlsafe_b64encode(
-        json.dumps({"alg": "ES256", "typ": "JWS"}, separators=(",", ":")).encode()
-    ).rstrip(b"=").decode()
+    header = (
+        base64.urlsafe_b64encode(
+            json.dumps({"alg": "ES256", "typ": "JWS"}, separators=(",", ":")).encode()
+        )
+        .rstrip(b"=")
+        .decode()
+    )
     payload = base64.urlsafe_b64encode(body).rstrip(b"=").decode()
 
     signing_input = f"{header}.{payload}".encode()
@@ -167,13 +174,20 @@ class UCPAdapter(MerchantAdapter):
                     caps = []
                     for svc in services:
                         caps.extend(svc.get("capabilities", []))
-                    return {"capabilities": caps, "ucp_version": profile.get("ucp", {}).get("version")}
+                    return {
+                        "capabilities": caps,
+                        "ucp_version": profile.get("ucp", {}).get("version"),
+                    }
         except Exception:
             pass
         return {}
 
     async def create_order(
-        self, sku: str, quantity: int, mandate_id: str, idempotency_key: str,
+        self,
+        sku: str,
+        quantity: int,
+        mandate_id: str,
+        idempotency_key: str,
         checkout_url: str | None = None,
     ) -> dict:
         """Execute a UCP checkout: create session → complete session.
