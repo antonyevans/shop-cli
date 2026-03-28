@@ -16,6 +16,7 @@ dependencies = [
     "cryptography>=42.0",
     "canonicaljson>=2.0",  # RFC 8785 JCS for mandate signing (python-jcs unavailable on PyPI)
     "pyyaml>=6.0",
+    "eval_type_backport>=0.2; python_version < '3.10'",  # X | None in Pydantic models on 3.9
 ]
 
 [project.scripts]
