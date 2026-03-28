@@ -64,6 +64,7 @@ class MerchantAdapter(ABC):
         mandate_id: str,
         idempotency_key: str,
         checkout_url: Optional[str] = None,
+        price_usd: float = 0.0,
     ) -> dict:
         """Submit an order.
 

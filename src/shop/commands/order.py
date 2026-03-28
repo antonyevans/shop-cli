@@ -147,7 +147,7 @@ async def _place_one_order(
     # Phase 2 — call merchant
     try:
         result = await adapter.create_order(
-            sku, quantity, mandate_id, idempotency_key, checkout_url=checkout_url
+            sku, quantity, mandate_id, idempotency_key, checkout_url=checkout_url, price_usd=price_usd
         )
     except CheckoutNotSupportedError:
         conn.execute("BEGIN")

@@ -206,6 +206,7 @@ class PayPalFastlaneAdapter(MerchantAdapter):
         mandate_id: str,
         idempotency_key: str,
         checkout_url: Optional[str] = None,
+        price_usd: float = 0.0,
     ) -> dict:
         """Place a headless order via PayPal Orders API v2 with Fastlane.
 
@@ -228,8 +229,8 @@ class PayPalFastlaneAdapter(MerchantAdapter):
         raw_sku = sku.removeprefix(f"{self.slug}:")
 
         # Phase 1: create order
-        # Value is required — use a placeholder if no price known from sku.
-        # In production, the calling layer should pass price via checkout_url metadata.
+        amount_str = f"{price_usd:.2f}"
+        unit_str = f"{price_usd / max(quantity, 1):.2f}"
         order_body: dict = {
             "intent": "CAPTURE",
             "purchase_units": [
@@ -240,15 +241,15 @@ class PayPalFastlaneAdapter(MerchantAdapter):
                         {
                             "name": raw_sku,
                             "quantity": str(quantity),
-                            "unit_amount": {"currency_code": self.currency, "value": "0.00"},
+                            "unit_amount": {"currency_code": self.currency, "value": unit_str},
                             "category": "PHYSICAL_GOODS",
                         }
                     ],
                     "amount": {
                         "currency_code": self.currency,
-                        "value": "0.00",
+                        "value": amount_str,
                         "breakdown": {
-                            "item_total": {"currency_code": self.currency, "value": "0.00"},
+                            "item_total": {"currency_code": self.currency, "value": amount_str},
                         },
                     },
                 }
@@ -256,7 +257,7 @@ class PayPalFastlaneAdapter(MerchantAdapter):
             "payment_source": {
                 "token": {
                     "id": cred["token"],
-                    "type": "BILLING_AGREEMENT",
+                    "type": "PAYMENT_METHOD_TOKEN",
                 }
             },
         }
