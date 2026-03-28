@@ -95,7 +95,7 @@ async def _cart_add_async(
         except MandateNotFoundError:
             mandate_id = None
 
-    confidence, _ = scoring.score(product)
+    confidence = scoring.score(product)[0] if product is not None else 1.0
 
     if dry_run:
         _emit({

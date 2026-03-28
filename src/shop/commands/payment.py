@@ -274,6 +274,181 @@ def run_payment_confirm_command(
     })
 
 
+@app.command("add-shop-pay")
+def payment_add_shop_pay(
+    label: str = typer.Option("Shop Pay", "--label", help="Name for this payment method"),
+    token: str = typer.Option(..., "--token", help="Shop Pay token from Shop Pay authorization"),
+    email: str = typer.Option(..., "--email", help="Buyer email registered with Shop Pay"),
+    first_name: str = typer.Option("", "--first-name"),
+    last_name: str = typer.Option("", "--last-name"),
+    address1: str = typer.Option("", "--address1"),
+    city: str = typer.Option("", "--city"),
+    province: str = typer.Option("", "--province", help="State/province code"),
+    country: str = typer.Option("US", "--country", help="ISO 3166-1 alpha-2"),
+    zip_code: str = typer.Option("", "--zip"),
+    shop_dir: Path = SHOP_DIR,
+) -> None:
+    """Store a Shop Pay token for agent checkout via Shopify's UCP/MCP protocol.
+
+    The Shop Pay token is obtained by authorizing the agent with Shop Pay.
+    Card details are stored securely by Shop Pay — the agent only uses the token.
+    """
+    run_payment_add_shop_pay_command(
+        label=label, token=token, email=email,
+        first_name=first_name, last_name=last_name,
+        address1=address1, city=city, province=province, country=country, zip_code=zip_code,
+        shop_dir=shop_dir,
+    )
+
+
+def run_payment_add_shop_pay_command(
+    label: str,
+    token: str,
+    email: str,
+    first_name: str = "",
+    last_name: str = "",
+    address1: str = "",
+    city: str = "",
+    province: str = "",
+    country: str = "US",
+    zip_code: str = "",
+    shop_dir: Path = SHOP_DIR,
+) -> None:
+    import uuid
+
+    if not token:
+        _error("missing_token", "Shop Pay token required (--token)", 1)
+    if not email:
+        _error("missing_email", "Buyer email required (--email)", 1)
+
+    method_id = f"shoppay_{uuid.uuid4().hex[:8]}"
+    billing_address = {
+        "first_name": first_name,
+        "last_name": last_name,
+        "street_address": address1,
+        "address_locality": city,
+        "address_region": province,
+        "postal_code": zip_code,
+        "address_country": country,
+    }
+
+    method = {
+        "id": method_id,
+        "label": label,
+        "type": "shop_pay",
+        "email": email,
+        "shop_pay_token": token,
+        "billing_address": billing_address,
+    }
+
+    data = _load_payment_file(shop_dir)
+    data["methods"] = [m for m in data["methods"] if m.get("label") != label]
+    data["methods"].append(method)
+    if not data.get("default"):
+        data["default"] = method_id
+
+    _save_payment_file(data, shop_dir)
+    _emit({
+        "status": "added",
+        "method_id": method_id,
+        "label": label,
+        "type": "shop_pay",
+        "email": email,
+        "default": data["default"] == method_id,
+    })
+
+
+@app.command("add-card")
+def payment_add_card(
+    label: str = typer.Option(..., "--label", help="Name for this payment method"),
+    number: str = typer.Option(..., "--number", help="Card number (dev/test use only)"),
+    first_name: str = typer.Option(..., "--first-name"),
+    last_name: str = typer.Option(..., "--last-name"),
+    month: int = typer.Option(..., "--month", help="Expiry month (1-12)"),
+    year: int = typer.Option(..., "--year", help="Expiry year"),
+    cvv: str = typer.Option(..., "--cvv"),
+    address1: str = typer.Option("", "--address1"),
+    city: str = typer.Option("", "--city"),
+    province: str = typer.Option("", "--province"),
+    country: str = typer.Option("US", "--country"),
+    zip_code: str = typer.Option("", "--zip"),
+    shop_dir: Path = SHOP_DIR,
+) -> None:
+    """[DEV/TEST ONLY] Store raw card credentials for Shopify headless checkout.
+
+    WARNING: Raw card details are stored in ~/.shop/payment.yaml. Use only
+    with test card numbers (e.g. Stripe 4242...) against dev/test stores.
+    Production use requires Stripe Setup Intent flow (shop payment add).
+    """
+    run_payment_add_card_command(
+        label=label, number=number, first_name=first_name, last_name=last_name,
+        month=month, year=year, cvv=cvv,
+        address1=address1, city=city, province=province, country=country, zip_code=zip_code,
+        shop_dir=shop_dir,
+    )
+
+
+def run_payment_add_card_command(
+    label: str,
+    number: str,
+    first_name: str,
+    last_name: str,
+    month: int,
+    year: int,
+    cvv: str,
+    address1: str = "",
+    city: str = "",
+    province: str = "",
+    country: str = "US",
+    zip_code: str = "",
+    shop_dir: Path = SHOP_DIR,
+) -> None:
+    import re
+    import uuid
+
+    clean_number = number.replace(" ", "").replace("-", "")
+    if not re.fullmatch(r"\d{12,19}", clean_number):
+        _error("invalid_card", "Card number must be 12-19 digits", 1)
+    if not 1 <= month <= 12:
+        _error("invalid_card", "Expiry month must be 1-12", 1)
+
+    method_id = f"card_{uuid.uuid4().hex[:8]}"
+    billing = {"address1": address1, "city": city, "province": province, "country": country, "zip": zip_code}
+    method = {
+        "id": method_id,
+        "label": label,
+        "type": "credit_card",
+        "number": clean_number,
+        "first_name": first_name,
+        "last_name": last_name,
+        "month": month,
+        "year": year,
+        "cvv": cvv,
+        "billing": billing,
+        "card_last4": clean_number[-4:],
+        "card_brand": "card",
+        "expiry": f"{month}/{year}",
+        "_dev_only": True,
+    }
+
+    data = _load_payment_file(shop_dir)
+    data["methods"] = [m for m in data["methods"] if m.get("label") != label]
+    data["methods"].append(method)
+    if not data.get("default"):
+        data["default"] = method_id
+
+    _save_payment_file(data, shop_dir)
+    _emit({
+        "status": "added",
+        "method_id": method_id,
+        "label": label,
+        "card_last4": clean_number[-4:],
+        "type": "credit_card",
+        "warning": "DEV/TEST ONLY — raw card stored. Use shop payment add for production.",
+        "default": data["default"] == method_id,
+    })
+
+
 @app.command("remove")
 def payment_remove(
     method_id: str = typer.Option(..., "--id", help="Payment method ID to remove"),

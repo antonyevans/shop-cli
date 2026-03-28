@@ -254,6 +254,65 @@ def run_merchant_add_shopify_store_command(
     })
 
 
+@app.command("add-shopify-checkout")
+def merchant_add_shopify_checkout(
+    store_domain: str = typer.Option(..., "--store-domain", help="e.g. my-store.myshopify.com"),
+    merchants_path: Path = MERCHANTS_PATH,
+) -> None:
+    """Register a Shopify store for agent checkout via UCP/MCP (Shop Pay).
+
+    Uses credentials from your connected Shopify Catalog app (shop merchant
+    connect-shopify). Run that first if you haven't already.
+    """
+    run_merchant_add_shopify_checkout_command(store_domain, merchants_path)
+
+
+def run_merchant_add_shopify_checkout_command(
+    store_domain: str,
+    merchants_path: Path = MERCHANTS_PATH,
+) -> None:
+    # Load catalog credentials from existing shopify merchant config
+    client_id: str = ""
+    client_secret: str = ""
+    if merchants_path.exists():
+        with merchants_path.open() as f:
+            data = yaml.safe_load(f) or {}
+        for m in data.get("merchants", []):
+            if m.get("adapter") == "shopify_catalog":
+                client_id = m.get("client_id", "")
+                client_secret = m.get("client_secret", "")
+                break
+
+    if not client_id or not client_secret:
+        _error(
+            "catalog_not_connected",
+            "Shopify Catalog not connected. Run: shop merchant connect-shopify --client-id ... --client-secret ...",
+            1,
+        )
+
+    domain = store_domain.strip().removeprefix("https://").removeprefix("http://").rstrip("/")
+    slug = domain.replace(".", "-").replace("_", "-")
+
+    merchant_data = {
+        "slug": slug,
+        "name": domain,
+        "adapter": "shopify_ucp",
+        "store_domain": domain,
+        "client_id": client_id,
+        "client_secret": client_secret,
+    }
+    _save_merchant(merchant_data, merchants_path)
+    _emit({
+        "status": "added",
+        "merchant": {
+            "slug": slug,
+            "store_domain": domain,
+            "adapter": "shopify_ucp",
+            "payment_handler": "dev.shopify.shop_pay",
+        },
+    })
+
+
 @app.command("connect-shopify")
 def merchant_connect_shopify(
     client_id: str = typer.Option(..., "--client-id", help="Shopify Dev Dashboard app client ID"),

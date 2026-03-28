@@ -73,11 +73,14 @@ def create_adapter(merchant: MerchantConfig):
     from shop.adapters.shopify_storefront import ShopifyStorefrontAdapter
     from shop.adapters.ucp import UCPAdapter
 
+    from shop.adapters.shopify_ucp import ShopifyUCPAdapter
+
     adapters = {
         "mock": MockAdapter,
         "ucp": UCPAdapter,
         "shopify_catalog": ShopifyCatalogAdapter,
         "shopify_storefront": ShopifyStorefrontAdapter,
+        "shopify_ucp": ShopifyUCPAdapter,
     }
 
     cls = adapters.get(merchant.adapter)
