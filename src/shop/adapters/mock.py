@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.resources
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 import yaml
 
@@ -31,7 +32,7 @@ _AVAILABILITY_MAP = {
 }
 
 
-def _load_fixture(fixture_path: str | None = None) -> list[dict]:
+def _load_fixture(fixture_path: Optional[str] = None) -> list[dict]:
     """Load fixture catalog from YAML.
 
     Precedence:
@@ -144,7 +145,7 @@ class MockAdapter(MerchantAdapter):
         quantity: int,
         mandate_id: str,
         idempotency_key: str,
-        checkout_url: str | None = None,
+        checkout_url: Optional[str] = None,
     ) -> dict:
         import uuid
 

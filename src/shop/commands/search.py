@@ -6,6 +6,7 @@ import asyncio
 import json
 import sys
 import time
+from typing import Optional
 
 import typer
 
@@ -100,8 +101,8 @@ async def _run_search(
 
 def run_search_command(
     query: str,
-    max_price: float | None,
-    min_rating: float | None,
+    max_price: Optional[float],
+    min_rating: Optional[float],
     in_stock_only: bool,
     explain: bool,
     merchants: list[MerchantConfig],
@@ -155,8 +156,8 @@ app = typer.Typer()
 @app.command("products")
 def search_products(
     query: str = typer.Argument(..., help="Search terms"),
-    max_price: float | None = typer.Option(None, "--max-price", help="Maximum price in USD"),
-    min_rating: float | None = typer.Option(
+    max_price: Optional[float] = typer.Option(None, "--max-price", help="Maximum price in USD"),
+    min_rating: Optional[float] = typer.Option(
         None, "--min-rating", help="Minimum seller rating (0-5)"
     ),
     in_stock_only: bool = typer.Option(False, "--in-stock-only", help="Only return in-stock items"),

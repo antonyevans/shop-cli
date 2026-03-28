@@ -25,6 +25,7 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
+from typing import Optional
 
 import httpx
 import yaml
@@ -46,7 +47,7 @@ def _get_shop_dir() -> Path:
     return Path(os.environ["SHOP_HOME"]) if "SHOP_HOME" in os.environ else Path.home() / ".shop"
 
 
-def _load_fastlane_credential(shop_dir: Path) -> dict | None:
+def _load_fastlane_credential(shop_dir: Path) -> Optional[dict]:
     """Load PayPal Fastlane token from payment.yaml.
 
     Returns {token, email, name} or None if no Fastlane method configured.
@@ -103,7 +104,7 @@ class PayPalFastlaneAdapter(MerchantAdapter):
         self.sandbox = str(config.get("paypal_sandbox", "")).lower() == "true"
         self.currency = config.get("currency", "USD").upper()
         self._base = _SANDBOX_BASE if self.sandbox else _LIVE_BASE
-        self._access_token: str | None = None
+        self._access_token: Optional[str] = None
         self._token_expires: float = 0.0
 
     async def _get_access_token(self) -> str:
@@ -204,7 +205,7 @@ class PayPalFastlaneAdapter(MerchantAdapter):
         quantity: int,
         mandate_id: str,
         idempotency_key: str,
-        checkout_url: str | None = None,
+        checkout_url: Optional[str] = None,
     ) -> dict:
         """Place a headless order via PayPal Orders API v2 with Fastlane.
 

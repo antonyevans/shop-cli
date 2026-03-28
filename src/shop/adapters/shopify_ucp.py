@@ -30,6 +30,7 @@ import os
 import time
 import uuid
 from pathlib import Path
+from typing import Optional
 
 import httpx
 import yaml
@@ -54,7 +55,7 @@ def _get_shop_dir() -> Path:
     return Path(os.environ["SHOP_HOME"]) if "SHOP_HOME" in os.environ else Path.home() / ".shop"
 
 
-def _load_shop_pay_credential(shop_dir: Path) -> dict | None:
+def _load_shop_pay_credential(shop_dir: Path) -> Optional[dict]:
     """Load Shop Pay payment credential from payment.yaml, or None if unavailable."""
     payment_path = shop_dir / "payment.yaml"
     if not payment_path.exists():
@@ -88,7 +89,7 @@ def _load_shop_pay_credential(shop_dir: Path) -> dict | None:
     }
 
 
-def _extract_variant_id(checkout_url: str) -> str | None:
+def _extract_variant_id(checkout_url: str) -> Optional[str]:
     """Extract Shopify variant GID from a cart URL.
 
     Format: https://store.myshopify.com/cart/VARIANT_ID:QTY
@@ -114,7 +115,7 @@ class ShopifyUCPAdapter(MerchantAdapter):
         self.store_domain = config.get("store_domain", "").strip()
         self.client_id = config.get("client_id", "")
         self.client_secret = config.get("client_secret", "")
-        self._jwt: str | None = None
+        self._jwt: Optional[str] = None
         self._jwt_expires: float = 0.0
 
     async def _get_jwt(self) -> str:
@@ -220,7 +221,7 @@ class ShopifyUCPAdapter(MerchantAdapter):
         quantity: int,
         mandate_id: str,
         idempotency_key: str,
-        checkout_url: str | None = None,
+        checkout_url: Optional[str] = None,
     ) -> dict:
         """Place a headless Shopify order via UCP/MCP JSON-RPC.
 
@@ -232,7 +233,7 @@ class ShopifyUCPAdapter(MerchantAdapter):
             raise AdapterError(self.slug, "store_domain, client_id, and client_secret required")
 
         # Resolve variant ID
-        variant_id: str | None = None
+        variant_id: Optional[str] = None
         if checkout_url:
             variant_id = _extract_variant_id(checkout_url)
         if not variant_id:

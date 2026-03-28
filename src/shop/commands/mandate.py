@@ -7,6 +7,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 import typer
 
@@ -42,11 +43,11 @@ def mandate_create(
     budget_total: float = typer.Option(..., "--budget-total"),
     per_order_max: float = typer.Option(..., "--per-order-max"),
     period: str = typer.Option(..., "--period"),
-    category_allow: str | None = typer.Option(None, "--category-allow"),
-    category_deny: str | None = typer.Option(None, "--category-deny"),
-    merchant_allow: str | None = typer.Option(None, "--merchant-allow"),
-    merchant_deny: str | None = typer.Option(None, "--merchant-deny"),
-    expires_at: str | None = typer.Option(None, "--expires-at"),
+    category_allow: Optional[str] = typer.Option(None, "--category-allow"),
+    category_deny: Optional[str] = typer.Option(None, "--category-deny"),
+    merchant_allow: Optional[str] = typer.Option(None, "--merchant-allow"),
+    merchant_deny: Optional[str] = typer.Option(None, "--merchant-deny"),
+    expires_at: Optional[str] = typer.Option(None, "--expires-at"),
     shop_dir: Path = SHOP_DIR,
 ) -> None:
     run_mandate_create_command(
@@ -66,11 +67,11 @@ def run_mandate_create_command(
     budget_total: float,
     per_order_max: float,
     period: str,
-    category_allow: str | None,
-    category_deny: str | None,
-    merchant_allow: str | None,
-    merchant_deny: str | None,
-    expires_at: str | None,
+    category_allow: Optional[str],
+    category_deny: Optional[str],
+    merchant_allow: Optional[str],
+    merchant_deny: Optional[str],
+    expires_at: Optional[str],
     shop_dir: Path = SHOP_DIR,
 ) -> None:
     if period not in ("monthly", "weekly", "one-time"):
@@ -79,7 +80,7 @@ def run_mandate_create_command(
     mandate_id = str(uuid.uuid4())
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    def _split(s: str | None) -> list[str]:
+    def _split(s: Optional[str]) -> list[str]:
         if not s:
             return []
         return [x.strip() for x in s.split(",") if x.strip()]
@@ -200,13 +201,13 @@ def run_mandate_verify_command(mandate_id: str, shop_dir: Path = SHOP_DIR) -> No
 
 @app.command("usage")
 def mandate_usage(
-    mandate_id: str | None = typer.Option(None, "--mandate-id"),
+    mandate_id: Optional[str] = typer.Option(None, "--mandate-id"),
     shop_dir: Path = SHOP_DIR,
 ) -> None:
     run_mandate_usage_command(mandate_id=mandate_id, shop_dir=shop_dir)
 
 
-def run_mandate_usage_command(mandate_id: str | None, shop_dir: Path = SHOP_DIR) -> None:
+def run_mandate_usage_command(mandate_id: Optional[str], shop_dir: Path = SHOP_DIR) -> None:
     if not mandate_id:
         from shop.config import load_config
 

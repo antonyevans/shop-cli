@@ -37,7 +37,7 @@ packages = ["src/shop"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "strict"
-addopts = "--tb=short"
+addopts = "--tb=short --ignore=tests/integration"
 markers = [
     "integration: real-credential tests — run with ./scripts/run-integration-tests.sh",
 ]
@@ -48,6 +48,7 @@ target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+ignore = ["UP045"]  # X | None requires Python 3.10+; we support 3.9
 
 [tool.coverage.run]
 source = ["src/shop"]

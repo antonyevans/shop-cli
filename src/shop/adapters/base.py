@@ -8,6 +8,7 @@ based on the `adapter` field in merchants.yaml.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from shop.models.commerce import CommerceTXTProduct, SearchFilters
 
@@ -62,7 +63,7 @@ class MerchantAdapter(ABC):
         quantity: int,
         mandate_id: str,
         idempotency_key: str,
-        checkout_url: str | None = None,
+        checkout_url: Optional[str] = None,
     ) -> dict:
         """Submit an order.
 

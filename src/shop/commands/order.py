@@ -10,6 +10,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 import typer
 
@@ -35,7 +36,7 @@ def _error(error_code: str, detail: str, exit_code: int) -> None:
     _emit({"error_code": error_code, "detail": detail, "exit_code": exit_code}, exit_code)
 
 
-def _store_domain_from_url(checkout_url: str) -> str | None:
+def _store_domain_from_url(checkout_url: str) -> Optional[str]:
     """Extract store domain (e.g. my-store.myshopify.com) from a Shopify checkout URL."""
     from urllib.parse import urlparse
 
@@ -50,8 +51,8 @@ async def _place_one_order(
     idempotency_key: str,
     shop_dir: Path,
     merchants_path: Path,
-    checkout_url: str | None = None,
-    price_usd_override: float | None = None,
+    checkout_url: Optional[str] = None,
+    price_usd_override: Optional[float] = None,
 ) -> dict:
     merchant_slug = sku.split(":")[0]
     merchants = load_merchants(merchants_path)
@@ -255,11 +256,11 @@ async def _place_one_order(
 
 
 async def _run_order_create(
-    sku: str | None,
+    sku: Optional[str],
     quantity: int,
     from_cart: bool,
-    session_id: str | None,
-    mandate_id: str | None,
+    session_id: Optional[str],
+    mandate_id: Optional[str],
     idempotency_key: str,
     shop_dir: Path,
     merchants_path: Path,
@@ -345,11 +346,11 @@ async def _run_order_create(
 
 @app.command("create")
 def order_create(
-    sku: str | None = typer.Option(None, "--sku"),
+    sku: Optional[str] = typer.Option(None, "--sku"),
     quantity: int = typer.Option(1, "--quantity"),
     from_cart: bool = typer.Option(False, "--from-cart"),
-    session_id: str | None = typer.Option(None, "--session-id"),
-    mandate_id: str | None = typer.Option(None, "--mandate-id"),
+    session_id: Optional[str] = typer.Option(None, "--session-id"),
+    mandate_id: Optional[str] = typer.Option(None, "--mandate-id"),
     idempotency_key: str = typer.Option(..., "--idempotency-key"),
     yes: bool = typer.Option(..., "--yes", "-y"),
     shop_dir: Path = SHOP_DIR,
@@ -369,12 +370,12 @@ def order_create(
 
 
 def run_order_create_command(
-    sku: str | None = None,
+    sku: Optional[str] = None,
     quantity: int = 1,
     from_cart: bool = False,
-    session_id: str | None = None,
-    mandate_id: str | None = None,
-    idempotency_key: str | None = None,
+    session_id: Optional[str] = None,
+    mandate_id: Optional[str] = None,
+    idempotency_key: Optional[str] = None,
     yes: bool = False,
     shop_dir: Path = SHOP_DIR,
     merchants_path: Path = MERCHANTS_PATH,

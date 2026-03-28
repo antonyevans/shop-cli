@@ -8,6 +8,7 @@ import sys
 import time
 import uuid
 from pathlib import Path
+from typing import Optional
 
 import typer
 
@@ -37,13 +38,13 @@ def _error(error_code: str, detail: str, exit_code: int) -> None:
 async def _cart_add_async(
     sku: str,
     quantity: int,
-    session_id: str | None,
+    session_id: Optional[str],
     dry_run: bool,
-    idempotency_key: str | None,
+    idempotency_key: Optional[str],
     shop_dir: Path,
     merchants_path: Path,
-    price_usd_override: float | None = None,
-    checkout_url: str | None = None,
+    price_usd_override: Optional[float] = None,
+    checkout_url: Optional[str] = None,
 ) -> None:
     from shop.adapters.base import AdapterError, ProductNotFoundError
 
@@ -155,15 +156,15 @@ async def _cart_add_async(
 def cart_add(
     sku: str = typer.Option(..., "--sku"),
     quantity: int = typer.Option(1, "--quantity"),
-    session_id: str | None = typer.Option(None, "--session-id"),
+    session_id: Optional[str] = typer.Option(None, "--session-id"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    idempotency_key: str | None = typer.Option(None, "--idempotency-key"),
-    price_usd: float | None = typer.Option(
+    idempotency_key: Optional[str] = typer.Option(None, "--idempotency-key"),
+    price_usd: Optional[float] = typer.Option(
         None,
         "--price-usd",
         help="Price override (required for catalog products that don't expose a detail endpoint)",
     ),
-    checkout_url: str | None = typer.Option(
+    checkout_url: Optional[str] = typer.Option(
         None, "--checkout-url", help="Shopify checkout URL from search results"
     ),
     shop_dir: Path = SHOP_DIR,
@@ -185,11 +186,11 @@ def cart_add(
 def run_cart_add_command(
     sku: str,
     quantity: int = 1,
-    session_id: str | None = None,
+    session_id: Optional[str] = None,
     dry_run: bool = False,
-    idempotency_key: str | None = None,
-    price_usd_override: float | None = None,
-    checkout_url: str | None = None,
+    idempotency_key: Optional[str] = None,
+    price_usd_override: Optional[float] = None,
+    checkout_url: Optional[str] = None,
     shop_dir: Path = SHOP_DIR,
     merchants_path: Path = MERCHANTS_PATH,
 ) -> None:
@@ -210,13 +211,13 @@ def run_cart_add_command(
 
 @app.command("view")
 def cart_view(
-    session_id: str | None = typer.Option(None, "--session-id"),
+    session_id: Optional[str] = typer.Option(None, "--session-id"),
     shop_dir: Path = SHOP_DIR,
 ) -> None:
     run_cart_view_command(session_id=session_id, shop_dir=shop_dir)
 
 
-def run_cart_view_command(session_id: str | None = None, shop_dir: Path = SHOP_DIR) -> None:
+def run_cart_view_command(session_id: Optional[str] = None, shop_dir: Path = SHOP_DIR) -> None:
     conn = get_db(shop_dir)
 
     if not session_id:
@@ -279,7 +280,7 @@ def run_cart_view_command(session_id: str | None = None, shop_dir: Path = SHOP_D
 
 @app.command("clear")
 def cart_clear(
-    session_id: str | None = typer.Option(None, "--session-id"),
+    session_id: Optional[str] = typer.Option(None, "--session-id"),
     yes: bool = typer.Option(..., "--yes", "-y"),
     shop_dir: Path = SHOP_DIR,
 ) -> None:
@@ -287,7 +288,7 @@ def cart_clear(
 
 
 def run_cart_clear_command(
-    session_id: str | None = None,
+    session_id: Optional[str] = None,
     yes: bool = False,
     shop_dir: Path = SHOP_DIR,
 ) -> None:

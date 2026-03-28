@@ -37,6 +37,7 @@ from __future__ import annotations
 import os
 import uuid
 from pathlib import Path
+from typing import Optional
 
 import httpx
 import yaml
@@ -56,7 +57,7 @@ def _get_shop_dir() -> Path:
     return Path(os.environ["SHOP_HOME"]) if "SHOP_HOME" in os.environ else Path.home() / ".shop"
 
 
-def _load_stripe_credential(shop_dir: Path) -> dict | None:
+def _load_stripe_credential(shop_dir: Path) -> Optional[dict]:
     """Load Stripe payment credentials from payment.yaml.
 
     Returns {"customer_id": ..., "payment_method_id": ...} or None.
@@ -145,7 +146,7 @@ class ACPAdapter(MerchantAdapter):
         quantity: int,
         mandate_id: str,
         idempotency_key: str,
-        checkout_url: str | None = None,
+        checkout_url: Optional[str] = None,
     ) -> dict:
         """Place a headless order via the ACP checkout endpoint.
 

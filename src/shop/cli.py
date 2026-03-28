@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sys
+from typing import Optional
 
 import typer
 
@@ -46,7 +47,7 @@ app.command("history")(history_command)
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    version: bool | None = typer.Option(None, "--version", is_eager=True, help="Show version"),
+    version: Optional[bool] = typer.Option(None, "--version", is_eager=True, help="Show version"),
 ) -> None:
     if version:
         print(json.dumps({"version": _VERSION}))

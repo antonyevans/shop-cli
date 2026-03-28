@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 import time
 from datetime import datetime, timezone
+from typing import Optional
 
 import httpx
 
@@ -52,7 +53,7 @@ class ShopifyCatalogAdapter(MerchantAdapter):
         self.client_secret = config.get("client_secret", "")
         self.ships_to = config.get("ships_to", "US")
         self.limit = min(int(config.get("limit", 10)), 10)
-        self._token: str | None = None
+        self._token: Optional[str] = None
         self._token_expires_at: float = 0.0
 
     async def _get_token(self) -> str:
@@ -161,7 +162,7 @@ class ShopifyCatalogAdapter(MerchantAdapter):
         quantity: int,
         mandate_id: str,
         idempotency_key: str,
-        checkout_url: str | None = None,
+        checkout_url: Optional[str] = None,
     ) -> dict:
         raise CheckoutNotSupportedError(
             self.slug,
@@ -222,7 +223,7 @@ class ShopifyCatalogAdapter(MerchantAdapter):
 
         # Extract checkout URL and variant ID from variant data
         checkout_url = variant.get("checkoutUrl") or variant.get("checkout_url")
-        variant_id: str | None = None
+        variant_id: Optional[str] = None
         if checkout_url:
             # Shopify cart URL format: https://store.myshopify.com/cart/VARIANT_ID:QTY
             m = re.search(r"/cart/(\d+)(?::|$)", checkout_url)

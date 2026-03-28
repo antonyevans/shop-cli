@@ -6,6 +6,7 @@ import base64
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 import yaml
 from canonicaljson import encode_canonical_json
@@ -141,9 +142,9 @@ def is_mandate_expired(mandate: dict) -> bool:
 def check_mandate_policy(
     mandate: dict,
     merchant_slug: str,
-    category: str | None,
+    category: Optional[str],
     price: float,
-) -> str | None:
+) -> Optional[str]:
     # (a) expired
     if is_mandate_expired(mandate):
         return "mandate_expired"

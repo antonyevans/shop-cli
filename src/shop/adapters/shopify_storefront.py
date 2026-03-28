@@ -26,6 +26,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+from typing import Optional
 
 import httpx
 import yaml
@@ -94,7 +95,7 @@ def _load_payment_config(shop_dir: Path) -> dict:
     return method
 
 
-def _extract_variant_id(checkout_url: str) -> str | None:
+def _extract_variant_id(checkout_url: str) -> Optional[str]:
     """Extract Shopify variant GID from a checkout URL.
 
     Shopify cart URL format: https://store.myshopify.com/cart/VARIANT_ID:QTY
@@ -241,7 +242,7 @@ class ShopifyStorefrontAdapter(MerchantAdapter):
         quantity: int,
         mandate_id: str,
         idempotency_key: str,
-        checkout_url: str | None = None,
+        checkout_url: Optional[str] = None,
     ) -> dict:
         """Place a headless Shopify order.
 
@@ -252,7 +253,7 @@ class ShopifyStorefrontAdapter(MerchantAdapter):
             raise AdapterError(self.slug, "store_domain and storefront_access_token required")
 
         # Resolve variant ID
-        variant_id: str | None = None
+        variant_id: Optional[str] = None
         if checkout_url:
             variant_id = _extract_variant_id(checkout_url)
         if not variant_id:

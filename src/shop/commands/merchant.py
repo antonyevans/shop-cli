@@ -8,6 +8,7 @@ import json
 import socket
 import sys
 from pathlib import Path
+from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -60,7 +61,7 @@ def _check_ssrf(url: str) -> None:
             )
 
 
-async def _discover_ucp_endpoint(base_url: str) -> tuple[str | None, str | None]:
+async def _discover_ucp_endpoint(base_url: str) -> tuple[Optional[str], Optional[str]]:
     """Return (ucp_endpoint, name) from /.well-known/ucp Business Profile, or (None, None)."""
     base = base_url.rstrip("/")
     async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
@@ -428,7 +429,7 @@ def run_merchant_add_shopify_checkout_command(
     )
 
 
-async def _discover_acp_endpoint(base_url: str) -> tuple[str | None, str | None]:
+async def _discover_acp_endpoint(base_url: str) -> tuple[Optional[str], Optional[str]]:
     """Return (acp_endpoint, name) from /.well-known/acp, or (None, None)."""
     base = base_url.rstrip("/")
     async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:

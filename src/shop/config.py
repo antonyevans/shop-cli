@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 import yaml
 
@@ -19,7 +20,7 @@ MERCHANTS_PATH = SHOP_DIR / "merchants.yaml"
 
 @dataclass
 class ShopConfig:
-    default_mandate: str | None = None
+    default_mandate: Optional[str] = None
     confidence_threshold: float = 0.80
     max_workers: int = 10
 

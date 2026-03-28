@@ -21,6 +21,7 @@ import json
 import os
 import uuid
 from pathlib import Path
+from typing import Optional
 
 import httpx
 import yaml
@@ -43,7 +44,7 @@ def _get_shop_dir() -> Path:
     return Path(os.environ["SHOP_HOME"]) if "SHOP_HOME" in os.environ else Path.home() / ".shop"
 
 
-def _load_stripe_payment(shop_dir: Path) -> dict | None:
+def _load_stripe_payment(shop_dir: Path) -> Optional[dict]:
     """Return Stripe payment credentials from payment.yaml, or None if unavailable.
 
     Only returns credentials if a confirmed Stripe method (type: stripe) exists.
@@ -188,7 +189,7 @@ class UCPAdapter(MerchantAdapter):
         quantity: int,
         mandate_id: str,
         idempotency_key: str,
-        checkout_url: str | None = None,
+        checkout_url: Optional[str] = None,
     ) -> dict:
         """Execute a UCP checkout: create session → complete session.
 
