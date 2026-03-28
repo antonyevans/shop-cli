@@ -255,9 +255,8 @@ class PayPalFastlaneAdapter(MerchantAdapter):
                 }
             ],
             "payment_source": {
-                "token": {
-                    "id": cred["token"],
-                    "type": "PAYMENT_METHOD_TOKEN",
+                "card": {
+                    "vault_id": cred["token"],
                 }
             },
         }
@@ -284,29 +283,35 @@ class PayPalFastlaneAdapter(MerchantAdapter):
                 )
             raise AdapterError(self.slug, f"PayPal order voided (status={order_status})")
 
-        # Phase 2: capture
-        capture_idem = f"{idempotency_key}-capture"
-        capture_result = await self._pp_post(
-            token,
-            f"/v2/checkout/orders/{order_id}/capture",
-            {},
-            capture_idem,
-        )
-
-        capture_status = capture_result.get("status", "")
-        if capture_status not in ("COMPLETED", "APPROVED"):
-            details = capture_result.get("purchase_units", [{}])[0]
-            payments = details.get("payments", {})
-            captures = payments.get("captures", [{}])
-            cap_status = captures[0].get("status", capture_status) if captures else capture_status
-            raise AdapterError(
-                self.slug,
-                f"PayPal capture did not complete (status={cap_status})",
+        # Phase 2: capture (skipped when create already returned COMPLETED)
+        if order_status == "COMPLETED":
+            # card.vault_id flow: auto-captured on create, no separate capture needed
+            purchase_units = order_result.get("purchase_units", [{}])
+            captures = purchase_units[0].get("payments", {}).get("captures", [{}])
+            capture_id = captures[0].get("id", "") if captures else ""
+        else:
+            capture_idem = f"{idempotency_key}-capture"
+            capture_result = await self._pp_post(
+                token,
+                f"/v2/checkout/orders/{order_id}/capture",
+                {},
+                capture_idem,
             )
 
-        purchase_units = capture_result.get("purchase_units", [{}])
-        captures = purchase_units[0].get("payments", {}).get("captures", [{}])
-        capture_id = captures[0].get("id", "") if captures else ""
+            capture_status = capture_result.get("status", "")
+            if capture_status not in ("COMPLETED", "APPROVED"):
+                details = capture_result.get("purchase_units", [{}])[0]
+                payments = details.get("payments", {})
+                captures = payments.get("captures", [{}])
+                cap_status = captures[0].get("status", capture_status) if captures else capture_status
+                raise AdapterError(
+                    self.slug,
+                    f"PayPal capture did not complete (status={cap_status})",
+                )
+
+            purchase_units = capture_result.get("purchase_units", [{}])
+            captures = purchase_units[0].get("payments", {}).get("captures", [{}])
+            capture_id = captures[0].get("id", "") if captures else ""
 
         return {
             "paypal_order_id": order_id,

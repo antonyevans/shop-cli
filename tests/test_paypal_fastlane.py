@@ -259,8 +259,7 @@ class TestCreateOrder:
             os.environ.pop("SHOP_HOME", None)
 
         payment_source = captured.get("payment_source", {})
-        assert payment_source.get("token", {}).get("id") == "fl_tok_xyz"
-        assert payment_source["token"]["type"] == "PAYMENT_METHOD_TOKEN"
+        assert payment_source.get("card", {}).get("vault_id") == "fl_tok_xyz"
 
     @pytest.mark.asyncio
     async def test_sku_prefix_stripped_in_reference_id(self, tmp_path):
