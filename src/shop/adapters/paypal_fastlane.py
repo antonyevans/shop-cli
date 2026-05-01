@@ -303,7 +303,9 @@ class PayPalFastlaneAdapter(MerchantAdapter):
                 details = capture_result.get("purchase_units", [{}])[0]
                 payments = details.get("payments", {})
                 captures = payments.get("captures", [{}])
-                cap_status = captures[0].get("status", capture_status) if captures else capture_status
+                cap_status = (
+                    captures[0].get("status", capture_status) if captures else capture_status
+                )
                 raise AdapterError(
                     self.slug,
                     f"PayPal capture did not complete (status={cap_status})",
