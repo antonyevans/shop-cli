@@ -1,12 +1,11 @@
 # shop
 
-> **Status: alpha (v0.1.0).** Core search, mandate, cart, and order flows work. PyPI and binary releases coming soon. Expect breaking changes until v1.0. Feedback welcome — open an issue.
+> **Status: alpha (v0.1.0).** Core search, mandate, cart, and order flows work. Expect breaking changes until v1.0. Feedback welcome — open an issue.
 
 **Agent-native commerce CLI.** All commands return JSON. Humans configure once; agents invoke autonomously.
 
 ```bash
-git clone https://github.com/antonyevans/shop-cli
-pip install -e shop-cli/
+pip install shop-cli
 shop search products "coffee filters" --max-price 20
 ```
 
@@ -23,11 +22,10 @@ Agents never see card credentials. Spending policy lives in signed mandate files
 ## Install
 
 ```bash
-git clone https://github.com/antonyevans/shop-cli
-pip install -e shop-cli/
+pip install shop-cli
 ```
 
-Requires Python 3.9+. A `pip install shop-cli` PyPI release is planned once the API stabilizes.
+Requires Python 3.9+.
 
 ---
 
