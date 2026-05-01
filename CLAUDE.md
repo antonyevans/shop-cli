@@ -61,6 +61,41 @@ Available skills: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-desig
 
 If gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to rebuild the binary and register skills.
 
+## Task Board
+
+Tasks for this project are tracked in the shared EA task board:
+
+```
+../executive-assistant/tasks/shop-cli/
+```
+
+Before creating a task:
+1. Read `../executive-assistant/tasks/AGENTS.md` for schema and protocol
+2. Read `../executive-assistant/tasks/_index.md` for the last used `shop-XXX` ID
+3. Create task file at `../executive-assistant/tasks/shop-cli/shop-{id}-{slug}.md`
+
+Use `shop-XXX` prefix for all shop-cli tasks. The existing `TODOS.md` remains for human-readable phase milestone tracking — the EA task board is for agent-trackable tasks with status, owner, and dependency fields.
+
+### Session Start Protocol
+
+At the start of every session, check for tasks assigned to `shop-dev`:
+
+```bash
+grep -r "agent: shop-dev" ../executive-assistant/tasks --include="*.md" -l
+```
+
+Or read `../executive-assistant/tasks/_index.md` for a quick overview of active tasks.
+
+### Creating Tasks Back to EA Agents
+
+When work in this repo surfaces something that needs EA agent attention (spec decision, mandate design, pricing call), create a task file in the EA task board:
+
+```
+../executive-assistant/tasks/ea/ea-{next-id}-{slug}.md
+```
+
+Set `agent:` to the appropriate EA agent (`coo`, `cmo`, etc.) and `delegated_to: shop-dev`.
+
 ## Open Questions
 
 - Multi-agent mandate sharing / delegation hierarchy (v1)

@@ -8,3 +8,14 @@ dist/
 build/
 .venv/
 venv/
+.gstack/
+
+# User config and credentials — never commit
+.context
+research/
+.claude/
+
+# Runtime shop data (lives at ~/.shop/ but guard against local overrides)
+payment.yaml
+config.yaml
+*.shop/
